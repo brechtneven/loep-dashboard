@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSINT Nieuwsdashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+<style>
+/* ─── TOKENS ────────────────────────────────────────────────────── */
+:root {
+  --bg: #111114;
+  --surface: #18181c;
+  --text: #e0ddd8;
+  --text-sub: #a09a90;
+  --text-dim: #6b665e;
+  --rule: #2a2a2e;
+  --rule-light: #1f1f23;
+
+  --coral: #c0695e;
+  --teal: #5a9ea2;
+  --sage: #6b8f71;
+  --ochre: #c4a35a;
+  --teal-dark: #1e4d52;
+  --slate: #6878a0;
+  --bronze: #a07858;
+  --navy: #5a6e8a;
+
+  --font-body: 'Georgia', serif;
+  --font-title: 'Source Serif 4', Georgia, serif;
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  overflow: hidden;
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+#dashboardWrapper {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── PROGRESS BAR ──────────────────────────────────────────────── */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--teal);
+  z-index: 1000;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* ─── HEADER ────────────────────────────────────────────────────── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header h1 {
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.header .status {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sage);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.search-bar {
+  flex: 1;
+  max-width: 320px;
+}
+
+.search-bar input {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.search-bar input:focus { border-color: var(--teal); }
+.search-bar input::placeholder { color: var(--text-dim); }
+
+.controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.source-toggle {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 3px 8px;
+  border: none;
+  background: var(--rule-light);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.source-toggle.active[data-source="vrt"] { background: var(--coral); color: #fff; }
+.source-toggle.active[data-source="hln"] { background: var(--ochre); color: #fff; }
+.source-toggle.active[data-source="demorgen"] { background: var(--teal); color: #fff; }
+.source-toggle.active[data-source="standaard"] { background: var(--slate); color: #fff; }
+.source-toggle.active[data-source="nieuwsblad"] { background: var(--bronze); color: #fff; }
+.source-toggle.active[data-source="tijd"] { background: var(--navy); color: #fff; }
+
+.btn {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.btn:hover { border-color: var(--text-dim); }
+.btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* ─── STATS STRIP ───────────────────────────────────────────────── */
+.stats-strip {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  padding: 4px 16px;
+  display: flex;
+  gap: 32px;
+  font-size: 10px;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.stat-number {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+
+.stat-label {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+
+/* BEL20 in stats strip */
+.stat-bel20 {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.stat-bel20:hover { opacity: 0.7; }
+
+.stat-bel20-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.stat-bel20 .stat-number {
+  font-size: 16px;
+}
+
+.stat-bel20-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+
+.stat-bel20-change {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.stat-bel20-change.up { color: var(--sage); }
+.stat-bel20-change.down { color: var(--coral); }
+.stat-bel20-change.flat { color: var(--text-dim); }
+
+.bel20-sparkline {
+  display: block;
+  width: 100%;
+  height: 48px;
+}
+
+/* ─── LAYOUT ────────────────────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── FEED ──────────────────────────────────────────────────────── */
+.feed {
+  overflow-y: auto;
+  padding: 6px 12px;
+}
+
+/* ─── ARTICLE ───────────────────────────────────────────────────── */
+.article {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule-light);
+  position: relative;
+  transition: background 0.1s;
+}
+
+.article:hover { background: rgba(69, 123, 126, 0.04); }
+
+.article.flagged {
+  border-left: 2px solid var(--ochre);
+  padding-left: 6px;
+}
+
+.article.breaking-article .article-title a { color: var(--coral); }
+
+.article-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.source-badge {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  color: #fff;
+  flex-shrink: 0;
+  position: relative;
+  top: -1px;
+}
+
+.source-badge.vrt { background: var(--coral); }
+.source-badge.hln { background: var(--ochre); }
+.source-badge.demorgen { background: var(--teal); }
+.source-badge.standaard { background: var(--slate); }
+.source-badge.nieuwsblad { background: var(--bronze); }
+.source-badge.tijd { background: var(--navy); }
+
+.breaking-tag {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--coral);
+  flex-shrink: 0;
+}
+
+.article-title {
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.article-title a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.article-title a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 1px;
+}
+
+.article-time {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.article-reliability {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.dedup-count {
+  font-size: 9px;
+  color: var(--teal);
+  cursor: pointer;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dedup-count:hover { text-decoration: underline; }
+
+.flag-btn {
+  font-size: 11px;
+  background: none;
+  border: none;
+  color: var(--rule);
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+
+.flag-btn:hover { color: var(--ochre); }
+.flag-btn.active { color: var(--ochre); }
+
+.article-summary-row {
+  padding-left: 0;
+  margin-top: 1px;
+}
+
+.article-summary {
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dedup-sources {
+  display: none;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed var(--rule-light);
+}
+
+.dedup-sources.open { display: block; }
+
+.dedup-sources div {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 1px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.dedup-sources a { color: var(--text-sub); text-decoration: none; }
+.dedup-sources a:hover { text-decoration: underline; }
+
+/* ─── SIDEBAR ───────────────────────────────────────────────────── */
+.sidebar {
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule-light);
+}
+
+.sidebar-section h3 {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 6px;
+}
+
+/* Trending */
+.trending-list { list-style: none; }
+
+.trending-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.trending-item:hover { color: var(--teal); }
+
+.trending-freq {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Flagged */
+.flagged-list { list-style: none; }
+
+.flagged-item {
+  padding: 2px 0;
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.flagged-item .title {
+  font-family: var(--font-title);
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-sub);
+}
+
+.flagged-item .remove {
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.flagged-item .remove:hover { color: var(--coral); }
+
+.sidebar .export-btn {
+  width: 100%;
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* Reliability */
+.reliability-list { list-style: none; }
+
+.reliability-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  font-size: 10px;
+  color: var(--text-sub);
+}
+
+.reliability-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.reliability-bar {
+  width: 40px;
+  height: 3px;
+  background: var(--rule-light);
+  overflow: hidden;
+}
+
+.reliability-fill { height: 100%; }
+.reliability-fill.high { background: var(--sage); }
+.reliability-fill.medium { background: var(--ochre); }
+.reliability-fill.low { background: var(--coral); }
+
+.reliability-pct {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Verkeer */
+.verkeer-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.verkeer-stat {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.verkeer-stat .num {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.verkeer-stat.alert .num { color: var(--coral); }
+
+.verkeer-bar {
+  height: 3px;
+  background: var(--rule-light);
+  width: 100%;
+  margin: 4px 0 2px;
+}
+
+.verkeer-bar-fill {
+  height: 100%;
+  background: var(--ochre);
+  transition: width 0.4s ease;
+}
+
+.verkeer-empty {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+.verkeer-footer {
+  margin-top: 4px;
+  font-size: 9px;
+}
+
+.verkeer-footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+
+.verkeer-footer a:hover { color: var(--teal); }
+
+/* ─── EMPTY / LOADING ───────────────────────────────────────────── */
+.empty-state, .loading-state {
+  text-align: center;
+  padding: 48px 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.loading-state::after {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--rule);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── STREAM BAR ───────────────────────────────────────────────── */
+#dashboardContent {
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+.dashboard-viewport {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.stream-bar {
+  height: 140px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: stretch;
+  z-index: 90;
+}
+
+.stream-bar-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-right: 1px solid var(--rule-light);
+  flex-shrink: 0;
+}
+
+.stream-channels {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.stream-channel {
+  flex: 1 1 0%;
+  min-width: 0;
+  position: relative;
+  border-right: 1px solid var(--rule-light);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.stream-channel video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.stream-channel-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(17,17,20,0.85));
+  padding: 16px 8px 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stream-channel-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--coral);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+.stream-channel-name {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #fff;
+}
+
+.stream-channel-expand {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Stream modal overlay */
+.stream-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+
+.stream-modal.open {
+  display: flex;
+}
+
+.stream-modal-content {
+  width: 80vw;
+  max-width: 960px;
+  aspect-ratio: 16/9;
+  position: relative;
+  background: #000;
+}
+
+.stream-modal-content video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.stream-modal-header {
+  position: absolute;
+  top: -32px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stream-modal-title {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stream-modal-close {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.stream-modal-close:hover { color: #fff; }
+
+/* ─── TOAST ─────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 160px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(43, 43, 43, 0.90);
+  color: #fff;
+  padding: 8px 20px;
+  z-index: 200;
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* ─── MARK ──────────────────────────────────────────────────────── */
+mark {
+  background: rgba(196, 163, 90, 0.25);
+  color: var(--text);
+  padding: 0 1px;
+}
+
+/* ─── GOOGLE TRENDS ─────────────────────────────────────────────── */
+.gtrends-list { list-style: none; }
+
+.gtrends-item {
+  padding: 4px 0;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.gtrends-item:hover { opacity: 0.8; }
+
+.gtrends-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+
+.gtrends-term {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.gtrends-traffic {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.gtrends-bar-track {
+  width: 100%;
+  height: 3px;
+  background: var(--rule-light);
+  overflow: hidden;
+}
+
+.gtrends-bar-fill {
+  height: 100%;
+  background: var(--teal);
+  transition: width 0.4s ease;
+}
+
+.gtrends-source {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gtrends-empty {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+.gtrends-footer {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--rule-light);
+}
+
+.gtrends-footer a {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--teal);
+  text-decoration: none;
+}
+
+.gtrends-footer a:hover { text-decoration: underline; }
+
+/* ─── SCROLLBAR ─────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule); }
+
+/* ─── BEL20 STOCKS SECTION ─────────────────────────────────────── */
+.stocks-section {
+  padding: 32px 40px 48px;
+  background: var(--bg);
+  flex: none;
+}
+
+.stocks-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 6px;
+}
+
+.stocks-header h3 {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.stocks-updated {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.stocks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0;
+}
+
+.stock-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--rule-light);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.stock-row:hover { background: rgba(69,123,126,0.04); }
+
+.stock-name {
+  color: var(--text);
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.stock-price {
+  color: var(--text-sub);
+  margin-right: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-change {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 58px;
+  text-align: right;
+}
+
+.stock-change.up { color: var(--sage); }
+.stock-change.down { color: var(--coral); }
+.stock-change.flat { color: var(--text-dim); }
+
+/* ─── RESPONSIVE ────────────────────────────────────────────────── */
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .header { flex-wrap: wrap; gap: 8px; }
+  .stats-strip { flex-wrap: wrap; gap: 16px; }
+  .stream-bar { height: 100px; }
+  .stream-channel { min-width: 0; }
+  .stream-modal-content { width: 95vw; }
+}
+</style>
+</head>
+<body>
+
+<div id="dashboardWrapper">
+<div id="dashboardContent">
+<div class="dashboard-viewport">
+<div class="progress-bar" id="progressBar"></div>
+
+<header class="header">
+  <h1>OSINT Nieuwsdashboard</h1>
+  <span class="status">
+    <span class="status-dot"></span>
+    <span id="lastUpdate">laden...</span>
+  </span>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Zoeken in koppen en samenvattingen" />
+  </div>
+  <div class="controls">
+    <button class="source-toggle active" data-source="vrt" onclick="toggleSource(this)">VRT</button>
+    <button class="source-toggle active" data-source="hln" onclick="toggleSource(this)">HLN</button>
+    <button class="source-toggle active" data-source="demorgen" onclick="toggleSource(this)">DM</button>
+    <button class="source-toggle active" data-source="tijd" onclick="toggleSource(this)">DT</button>
+    <button class="source-toggle" data-source="standaard" onclick="toggleSource(this)">DS</button>
+    <button class="source-toggle" data-source="nieuwsblad" onclick="toggleSource(this)">HNB</button>
+  </div>
+</header>
+
+<div class="stats-strip">
+  <div class="stat">
+    <span class="stat-number" id="statTotal">&mdash;</span>
+    <span class="stat-label">artikelen</span>
+  </div>
+  <div class="stat">
+    <span class="stat-number" id="statDedup">&mdash;</span>
+    <span class="stat-label">uniek</span>
+  </div>
+  <a class="stat-bel20" id="bel20Stat" href="https://www.google.com/finance/quote/BEL20:INDEXEURO?hl=nl" target="_blank" rel="noopener" title="BEL20 — Bekijk op Google Finance" style="text-decoration:none">
+    <div class="stat-bel20-row">
+      <span class="stat-bel20-label">BEL20</span>
+      <span class="stat-number" id="bel20Value">&mdash;</span>
+      <span class="stat-bel20-change flat" id="bel20Change"></span>
+    </div>
+  </a>
+</div>
+
+<div class="layout">
+  <main class="feed" id="feed">
+    <div class="loading-state">Feeds laden</div>
+  </main>
+
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h3>BEL20 Intraday</h3>
+      <canvas class="bel20-sparkline" id="bel20Sparkline"></canvas>
+    </div>
+    <div class="sidebar-section">
+      <h3>Google Trends Vlaanderen</h3>
+      <ul class="gtrends-list" id="gtrendsList">
+        <li class="gtrends-empty">Laden...</li>
+      </ul>
+      <div class="gtrends-footer">
+        <a href="https://trends.google.com/trending?geo=BE-VLG" target="_blank" rel="noopener">Bekijk op Google Trends &rarr;</a>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Verkeer Vlaanderen</h3>
+      <div id="verkeerWidget">
+        <div class="verkeer-empty">Laden...</div>
+      </div>
+      <div class="verkeer-footer">
+        <a href="https://www.verkeerscentrum.be/" target="_blank" rel="noopener">Verkeerscentrum &rarr;</a>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Trending onderwerpen</h3>
+      <ul class="trending-list" id="trendingList"></ul>
+    </div>
+    <div class="sidebar-section">
+      <h3>Bronbetrouwbaarheid</h3>
+      <ul class="reliability-list" id="reliabilityList"></ul>
+    </div>
+  </aside>
+</div>
+
+<div class="stream-bar">
+  <div class="stream-bar-label">LIVE</div>
+  <div class="stream-channels" id="streamChannels"></div>
+</div>
+</div><!-- /dashboard-viewport -->
+<div class="stocks-section" id="stocksSection">
+  <div class="stocks-header">
+    <h3>BEL20 Aandelen</h3>
+    <span class="stocks-updated" id="stocksUpdated"></span>
+  </div>
+  <div class="stocks-grid" id="stocksGrid">
+    <div class="verkeer-empty">Laden...</div>
+  </div>
+</div>
+</div><!-- /dashboardContent -->
+</div><!-- /dashboardWrapper -->
+
+<div class="stream-modal" id="streamModal">
+  <div class="stream-modal-content">
+    <div class="stream-modal-header">
+      <span class="stream-modal-title">
+        <span class="stream-channel-dot"></span>
+        <span id="streamModalTitle">LIVE</span>
+      </span>
+      <button class="stream-modal-close" onclick="closeStreamModal()">Sluiten &times;</button>
+    </div>
+    <video id="streamModalVideo" autoplay controls></video>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIG ─────────────────────────────────────────────────────────
+const CONFIG = {
+  refreshInterval: 5 * 60 * 1000,
+  breakingThreshold: 30 * 60 * 1000,
+  dedupThreshold: 0.55,
+  cacheKey: 'osint_feed_cache',
+  sources: {
+    vrt: {
+      name: 'VRT NWS',
+      url: 'https://www.vrt.be/vrtnws/nl.rss.articles.xml',
+      reliability: 92,
+      label: 'Openbare omroep, sterke factchecking'
+    },
+    hln: {
+      name: 'HLN',
+      url: 'https://www.hln.be/rss.xml',
+      reliability: 65,
+      label: 'Populair, soms sensationeel'
+    },
+    demorgen: {
+      name: 'De Morgen',
+      url: 'https://www.demorgen.be/rss.xml',
+      reliability: 82,
+      label: 'Kwaliteitskrant, progressief-analytisch'
+    },
+    standaard: {
+      name: 'De Standaard',
+      url: 'https://news.google.com/rss/search?q=site:standaard.be&hl=nl&gl=BE&ceid=BE:nl',
+      reliability: 88,
+      label: 'Kwaliteitskrant, via Google News (tijdelijk)'
+    },
+    nieuwsblad: {
+      name: 'Het Nieuwsblad',
+      url: 'https://news.google.com/rss/search?q=site:nieuwsblad.be&hl=nl&gl=BE&ceid=BE:nl',
+      reliability: 72,
+      label: 'Breed regionaal, via Google News (tijdelijk)'
+    },
+    tijd: {
+      name: 'De Tijd',
+      url: 'https://www.tijd.be/rss/nieuws.xml',
+      reliability: 90,
+      label: 'Financieel-economische kwaliteitskrant'
+    }
+  },
+  streams: [
+    // Internationaal
+    { name: 'CBS News', hlsUrl: 'https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562deeca/master.m3u8', siteUrl: 'https://www.cbsnews.com/live/' },
+    { name: 'Al Jazeera', hlsUrl: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', siteUrl: 'https://www.aljazeera.com/video/live' },
+    { name: 'Euronews', hlsUrl: 'https://dash4.antik.sk/live/test_euronews/playlist.m3u8', siteUrl: 'https://www.euronews.com/live' },
+    { name: 'HLN Live', hlsUrl: 'https://live-streaming.dpgmedia.net/hln-live-srt-mdai62ncqonw1qi0ec81tgeti80mtf/index_720.m3u8', siteUrl: 'https://www.hln.be/video/live' },
+    // Belgisch-nationaal
+    { name: 'LN24', hlsUrl: 'https://live-ln24.digiteka.com/1911668011/index.m3u8', siteUrl: 'https://www.ln24.be' },
+    { name: 'BX1', hlsUrl: 'https://59959724487e3.streamlock.net/stream/live/playlist.m3u8', siteUrl: 'https://bx1.be' },
+    // Vlaams-regionaal
+    { name: 'ATV', hlsUrl: 'https://live.zendzend.com/cmaf/29375_107244/master.m3u8', siteUrl: 'https://www.atv.be' },
+    { name: 'TVL', hlsUrl: 'https://live.zendzend.com/cmaf/29375_395474/master.m3u8', siteUrl: 'https://www.tvl.be' }
+  ],
+  stopWords: new Set([
+    'de','het','een','van','in','is','op','dat','die','en','voor','met','zijn',
+    'er','aan','wordt','niet','ook','om','uit','maar','door','nog','als','bij',
+    'kan','meer','over','werd','al','naar','dan','ze','was','heeft','hun','dit',
+    'na','worden','wat','je','wel','tot','geen','nieuwe','grote','moet','ons',
+    'zo','hebben','had','jaar','twee','veel','eerste','hele','heel','drie',
+    'waar','wie','hoe','tegen','onder','tussen','omdat','sinds','tijdens',
+    'moeten','kunnen','zal','zou','gaat','komt','staat','laat','zegt','maakt',
+    'zeer','alle','deze','elk','elke','ander','andere','weer','vaak','goed',
+    'lang','kort','klein','groot','want','dus','toch','daar','hier','nu','toen'
+  ])
+};
+
+// ─── STATE ──────────────────────────────────────────────────────────
+let allArticles = [];
+const GOOGLE_NEWS_SOURCES = new Set(['standaard', 'nieuwsblad']);
+let activeSources = new Set(Object.keys(CONFIG.sources).filter(k => !GOOGLE_NEWS_SOURCES.has(k)));
+let searchQuery = '';
+
+// ─── PROGRESS BAR ───────────────────────────────────────────────────
+const feedEl = document.getElementById('feed');
+feedEl.addEventListener('scroll', () => {
+  const el = document.getElementById('progressBar');
+  const scrollTop = feedEl.scrollTop;
+  const scrollHeight = feedEl.scrollHeight - feedEl.clientHeight;
+  el.style.width = scrollHeight > 0 ? (scrollTop / scrollHeight * 100) + '%' : '0%';
+});
+
+// ─── RSS FETCHING ───────────────────────────────────────────────────
+function parseXMLFeed(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'application/xml');
+  const isAtom = !!doc.querySelector('feed');
+  const items = isAtom ? doc.querySelectorAll('entry') : doc.querySelectorAll('item');
+  return Array.from(items).map(el => {
+    const get = tag => { const n = el.querySelector(tag); return n ? n.textContent.trim() : ''; };
+    const title = get('title');
+    const link = isAtom ? (el.querySelector('link[rel="alternate"]') || el.querySelector('link'))?.getAttribute('href') || get('link') : get('link');
+    const rawDate = isAtom ? get('published') || get('updated') : get('pubDate');
+    const descHTML = isAtom ? get('summary') || get('content') : get('description');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = descHTML;
+    const summary = tmp.textContent.trim().substring(0, 300);
+    const date = rawDate ? new Date(rawDate) : new Date();
+    return { title, link, summary, rawDate, date };
+  });
+}
+
+async function fetchFeed(sourceKey) {
+  const source = CONFIG.sources[sourceKey];
+  if (!source.url) return [];
+  try {
+    const bustUrl = source.url + (source.url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(bustUrl), { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const xmlText = await resp.text();
+    const items = parseXMLFeed(xmlText);
+    // Google News RSS: titels opschonen (verwijder " - Bronnaam" suffix)
+    const gnSuffixes = [' - De Standaard', ' - Nieuwsblad', ' - Het Nieuwsblad'];
+    return items.map(item => {
+      let title = item.title;
+      for (const suffix of gnSuffixes) {
+        if (title.endsWith(suffix)) { title = title.slice(0, -suffix.length).trim(); break; }
+      }
+      const date = item.date;
+      return {
+        id: hashString(sourceKey + title + item.link),
+        source: sourceKey,
+        title,
+        link: item.link,
+        summary: item.summary,
+        date,
+        timestamp: date.getTime()
+      };
+    });
+  } catch (e) {
+    console.warn('Feed fout voor ' + sourceKey + ':', e);
+    return [];
+  }
+}
+
+async function fetchAllFeeds() {
+  const keys = Object.keys(CONFIG.sources).filter(k => CONFIG.sources[k].url);
+  document.getElementById('lastUpdate').textContent = 'ophalen\u2026';
+  const results = await Promise.allSettled(keys.map(k => fetchFeed(k)));
+  let articles = [];
+  results.forEach(r => { if (r.status === 'fulfilled') articles = articles.concat(r.value); });
+  if (articles.length > 0) {
+    try { localStorage.setItem(CONFIG.cacheKey, JSON.stringify({ timestamp: Date.now(), articles })); } catch (e) {}
+  }
+  return articles;
+}
+
+function loadCachedFeeds() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CONFIG.cacheKey));
+    if (c && c.articles) { c.articles.forEach(a => { a.date = new Date(a.date); a.timestamp = a.date.getTime(); }); return c; }
+  } catch (e) {}
+  return null;
+}
+
+// ─── DEDUPLICATION ──────────────────────────────────────────────────
+function normalizeText(t) { return t.toLowerCase().replace(/[^a-z0-9\s\u00e0-\u00ff]/g, '').replace(/\s+/g, ' ').trim(); }
+
+function similarity(a, b) {
+  const wA = new Set(normalizeText(a).split(' ')), wB = new Set(normalizeText(b).split(' '));
+  if (!wA.size || !wB.size) return 0;
+  let n = 0; wA.forEach(w => { if (wB.has(w)) n++; });
+  return n / Math.max(wA.size, wB.size);
+}
+
+function deduplicateArticles(articles) {
+  const groups = [], used = new Set();
+  for (let i = 0; i < articles.length; i++) {
+    if (used.has(i)) continue;
+    const g = [articles[i]]; used.add(i);
+    for (let j = i + 1; j < articles.length; j++) {
+      if (used.has(j)) continue;
+      if (similarity(articles[i].title, articles[j].title) >= CONFIG.dedupThreshold) { g.push(articles[j]); used.add(j); }
+    }
+    groups.push(g);
+  }
+  return groups;
+}
+
+// ─── TRENDING ───────────────────────────────────────────────────────
+function extractTrending(articles) {
+  const freq = {};
+  articles.slice(0, 50).forEach(a => {
+    const raw = a.title + ' ' + a.summary;
+    const decoded = raw.replace(/&quot;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#039;|&apos;/g, "'");
+    decoded.split(/[\s,.\-:;!?()"']+/).forEach(w => {
+      const c = w.trim();
+      if (c.length < 3) return;
+      const lower = c.toLowerCase();
+      if (CONFIG.stopWords.has(lower) || /^\d+$/.test(c)) return;
+      const key = /^[A-Z\u00C0-\u00DC]/.test(c) ? c : lower;
+      freq[key] = (freq[key] || 0) + 1;
+    });
+  });
+  const merged = {};
+  Object.entries(freq).forEach(([w, n]) => {
+    const l = w.toLowerCase();
+    if (!merged[l] || /^[A-Z]/.test(w)) merged[l] = { display: merged[l]?.count > n ? (merged[l]?.display || w) : w, count: (merged[l]?.count || 0) + n };
+    else merged[l].count += n;
+  });
+  return Object.values(merged).filter(e => e.count >= 2).sort((a, b) => b.count - a.count).slice(0, 15);
+}
+
+// ─── RENDERING ──────────────────────────────────────────────────────
+function render() {
+  const now = Date.now();
+  let filtered = allArticles.filter(a => {
+    if (!activeSources.has(a.source)) return false;
+    if (searchQuery) { const q = searchQuery.toLowerCase(); return a.title.toLowerCase().includes(q) || a.summary.toLowerCase().includes(q); }
+    return true;
+  });
+  filtered.sort((a, b) => b.timestamp - a.timestamp);
+  const groups = deduplicateArticles(filtered);
+  document.getElementById('statTotal').textContent = filtered.length;
+  document.getElementById('statDedup').textContent = groups.length;
+
+  const h = [];
+  groups.forEach(group => {
+    const p = group[0];
+    const timeStr = p.date.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = p.date.toLocaleDateString('nl-BE', { day: 'numeric', month: 'short' });
+
+    let cls = 'article';
+
+    h.push('<div class="' + cls + '">');
+    h.push('<div class="article-row">');
+    h.push('<span class="source-badge ' + p.source + '">' + CONFIG.sources[p.source].name + '</span>');
+    h.push('<span class="article-title"><a href="' + escapeHtml(p.link) + '" target="_blank" rel="noopener">' + highlightSearch(escapeHtml(p.title)) + '</a></span>');
+    if (group.length > 1) {
+      const others = group.slice(1).map(a => CONFIG.sources[a.source].name).join(', ');
+      h.push('<span class="dedup-count" onclick="this.closest(\'.article\').querySelector(\'.dedup-sources\')?.classList.toggle(\'open\')" title="Ook bij: ' + escapeHtml(others) + '">+' + (group.length - 1) + '</span>');
+    }
+    h.push('<span class="article-time">' + dateStr + ' ' + timeStr + ' \u00b7 ' + formatTimeAgo(p.date) + '</span>');
+    h.push('<span class="article-reliability" title="' + escapeHtml(CONFIG.sources[p.source].label) + '">' + CONFIG.sources[p.source].reliability + '%</span>');
+    h.push('</div>');
+
+    if (p.summary) {
+      h.push('<div class="article-summary-row"><div class="article-summary">' + highlightSearch(escapeHtml(p.summary)) + '</div></div>');
+    }
+
+    if (group.length > 1) {
+      h.push('<div class="dedup-sources">');
+      group.slice(1).forEach(a => {
+        h.push('<div><span class="source-badge ' + a.source + '" style="font-size:7px;padding:0 4px">' + CONFIG.sources[a.source].name + '</span> <a href="' + escapeHtml(a.link) + '" target="_blank" rel="noopener">' + escapeHtml(a.title) + '</a></div>');
+      });
+      h.push('</div>');
+    }
+    h.push('</div>');
+  });
+
+  if (groups.length === 0) h.push('<div class="empty-state">Geen artikelen gevonden</div>');
+  document.getElementById('feed').innerHTML = h.join('');
+
+  renderTrending();
+  renderReliability();
+}
+
+function renderTrending() {
+  document.getElementById('trendingList').innerHTML = extractTrending(allArticles).map(t =>
+    '<li class="trending-item" onclick="document.getElementById(\'searchInput\').value=\'' + escapeHtml(t.display) + '\';searchQuery=\'' + t.display.toLowerCase() + '\';render()">' +
+    '<span>' + escapeHtml(t.display) + '</span><span class="trending-freq">' + t.count + '</span></li>'
+  ).join('');
+}
+
+
+function renderReliability() {
+  document.getElementById('reliabilityList').innerHTML = Object.entries(CONFIG.sources).map(([k, s]) => {
+    const lv = s.reliability >= 85 ? 'high' : s.reliability >= 70 ? 'medium' : 'low';
+    return '<li class="reliability-item"><span>' + s.name + '</span><div class="reliability-bar-wrap"><div class="reliability-bar"><div class="reliability-fill ' + lv + '" style="width:' + s.reliability + '%"></div></div><span class="reliability-pct">' + s.reliability + '%</span></div></li>';
+  }).join('');
+}
+
+// ─── VERKEER VLAANDEREN (DATEX II) ──────────────────────────────────
+async function fetchVerkeer() {
+  try {
+    const resp = await fetch('https://www.verkeerscentrum.be/uitwisseling/datex2v3', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const xml = await resp.text();
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const xsi = 'http://www.w3.org/2001/XMLSchema-instance';
+    const incidents = [];
+
+    doc.querySelectorAll('situationRecord').forEach(rec => {
+      const type = rec.getAttributeNS(xsi, 'type') || rec.getAttribute('xsi:type') || '';
+      const shortType = type.split(':').pop();
+
+      // Skip MaintenanceWorks
+      if (shortType === 'MaintenanceWorks') return;
+
+      // RoadOrCarriageway: only keep roadClosed
+      if (shortType === 'RoadOrCarriagewayOrLaneManagement') {
+        const mgmtType = rec.querySelector('roadOrCarriagewayOrLaneManagementType');
+        if (!mgmtType || mgmtType.textContent !== 'roadClosed') return;
+      }
+
+      // Only keep types we care about
+      const validTypes = ['AbnormalTraffic', 'Accident', 'RoadOrCarriagewayOrLaneManagement', 'ReroutingManagement', 'GeneralObstruction'];
+      if (!validTypes.includes(shortType)) return;
+
+      // Must be active
+      const status = rec.querySelector('validityStatus');
+      if (status && status.textContent !== 'active') return;
+
+      const created = rec.querySelector('situationRecordCreationTime');
+      const ts = created ? new Date(created.textContent).getTime() : 0;
+
+      let category, label;
+      if (shortType === 'AbnormalTraffic') {
+        category = 'file';
+        label = 'File';
+      } else if (shortType === 'Accident') {
+        category = 'ongeval';
+        label = 'Ongeval';
+      } else if (shortType === 'RoadOrCarriagewayOrLaneManagement') {
+        category = 'dicht';
+        label = 'Afgesloten';
+      } else if (shortType === 'ReroutingManagement') {
+        category = 'omleiding';
+        label = 'Omleiding';
+      } else {
+        category = 'dicht';
+        label = 'Obstructie';
+      }
+
+      // Queue length (meters) for AbnormalTraffic
+      let lengthM = 0;
+      const ql = rec.querySelector('queueLength');
+      if (ql) lengthM = parseFloat(ql.textContent) || 0;
+
+      // Time formatting
+      const timeStr = ts ? new Date(ts).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' }) : '';
+
+      // For long-running incidents (closures), show date instead of time
+      let sinceDate = '';
+      if (category !== 'file' && ts) {
+        const ageH = (Date.now() - ts) / 3600000;
+        if (ageH > 24) {
+          sinceDate = new Date(ts).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short' });
+        }
+      }
+
+      incidents.push({ category, label, lengthM, ts, timeStr, sinceDate });
+    });
+
+    // Sort newest first
+    incidents.sort((a, b) => b.ts - a.ts);
+    renderVerkeer(incidents);
+  } catch (e) {
+    console.warn('Verkeer Vlaanderen mislukt:', e.message);
+    document.getElementById('verkeerWidget').innerHTML = '<div class="verkeer-empty">Niet beschikbaar</div>';
+  }
+}
+
+function renderVerkeer(incidents) {
+  const widget = document.getElementById('verkeerWidget');
+  if (!incidents.length) {
+    widget.innerHTML = '<div class="verkeer-empty">Geen incidenten</div>';
+    return;
+  }
+
+  // Summary stats: alleen totale filelengte + ongevallen
+  const totalKm = incidents.filter(i => i.category === 'file').reduce((s, i) => s + i.lengthM, 0) / 1000;
+  const accidents = incidents.filter(i => i.category === 'ongeval').length;
+
+  let html = '<div class="verkeer-summary">';
+  html += '<span class="verkeer-stat"><span class="num">' + totalKm.toFixed(1) + '</span> km file</span>';
+  if (accidents > 0) html += '<span class="verkeer-stat alert"><span class="num">' + accidents + '</span> ongeval' + (accidents > 1 ? 'len' : '') + '</span>';
+  html += '</div>';
+
+  // Filedruk-balkje: 0 km = leeg, 300 km = vol
+  const pct = Math.min(100, (totalKm / 300) * 100);
+  html += '<div class="verkeer-bar"><div class="verkeer-bar-fill" style="width:' + pct + '%"></div></div>';
+
+  widget.innerHTML = html;
+}
+
+// ─── GOOGLE TRENDS VLAANDEREN ────────────────────────────────────────
+async function fetchGoogleTrends() {
+  const rssUrl = 'https://trends.google.com/trending/rss?geo=BE-VLG';
+
+  // Strategy 1: allorigins (full data with traffic numbers)
+  try {
+    const resp = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(rssUrl));
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.contents && data.contents.startsWith('<?xml')) {
+        const trends = parseGoogleTrendsXml(data.contents);
+        if (trends.length > 0) return trends;
+      }
+    }
+  } catch (e) {
+    console.warn('Google Trends via allorigins mislukt:', e.message);
+  }
+
+  // Strategy 2: rss2json fallback (titles only, no traffic)
+  try {
+    const resp = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(rssUrl));
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.status === 'ok' && data.items) {
+        return data.items.map((item, i) => ({
+          title: (item.title || '').trim(),
+          traffic: Math.max(1, data.items.length - i),
+          trafficRaw: '',
+          newsTitle: '', newsSource: '', newsUrl: ''
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn('Google Trends via rss2json mislukt:', e.message);
+  }
+
+  return [];
+}
+
+function parseGoogleTrendsXml(contents) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(contents, 'text/xml');
+  const items = xml.querySelectorAll('item');
+  const trends = [];
+
+  items.forEach(item => {
+    const title = item.querySelector('title')?.textContent?.trim() || '';
+    const ns = 'https://trends.google.com/trending/rss';
+    const trafficRaw = item.getElementsByTagNameNS(ns, 'approx_traffic')[0]?.textContent?.trim() || '';
+    const newsTitle = item.getElementsByTagNameNS(ns, 'news_item_title')[0]?.textContent?.trim() || '';
+    const newsSource = item.getElementsByTagNameNS(ns, 'news_item_source')[0]?.textContent?.trim() || '';
+    const newsUrl = item.getElementsByTagNameNS(ns, 'news_item_url')[0]?.textContent?.trim() || '';
+
+    let traffic = 0;
+    const match = trafficRaw.replace(/[+,]/g, '').match(/(\d+)(K?)/i);
+    if (match) traffic = parseInt(match[1]) * (match[2] ? 1000 : 1);
+
+    trends.push({ title, traffic, trafficRaw, newsTitle, newsSource, newsUrl });
+  });
+
+  return trends;
+}
+
+function renderGoogleTrends(trends) {
+  const list = document.getElementById('gtrendsList');
+  if (!trends.length) {
+    list.innerHTML = '<li class="gtrends-empty">Geen data beschikbaar</li>';
+    return;
+  }
+
+  const maxTraffic = Math.max(...trends.map(t => t.traffic), 1);
+
+  list.innerHTML = trends.slice(0, 10).map(t => {
+    const pct = Math.max(4, (t.traffic / maxTraffic) * 100);
+    const onclick = "document.getElementById('searchInput').value='" + escapeHtml(t.title) + "';searchQuery='" + t.title.toLowerCase() + "';render()";
+    return '<li class="gtrends-item" onclick="' + onclick + '">' +
+      '<div class="gtrends-top">' +
+        '<span class="gtrends-term">' + escapeHtml(t.title) + '</span>' +
+        '<span class="gtrends-traffic">' + escapeHtml(t.trafficRaw) + '</span>' +
+      '</div>' +
+      '<div class="gtrends-bar-track"><div class="gtrends-bar-fill" style="width:' + pct + '%"></div></div>' +
+      (t.newsSource ? '<div class="gtrends-source">' + escapeHtml(t.newsSource) + (t.newsTitle ? ': ' + escapeHtml(t.newsTitle.substring(0, 50)) : '') + '</div>' : '') +
+    '</li>';
+  }).join('');
+}
+
+// ─── BEL20 INDEX ────────────────────────────────────────────────────
+async function fetchBel20() {
+  const bustUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EBFX?interval=5m&range=1d&_cb=' + Date.now();
+  try {
+    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(bustUrl), { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    const result = data.chart.result[0];
+    const meta = result.meta;
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose || meta.previousClose;
+    const change = price - prevClose;
+    const changePct = (change / prevClose) * 100;
+
+    document.getElementById('bel20Value').textContent = price.toLocaleString('nl-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const changeEl = document.getElementById('bel20Change');
+    const dir = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+    const arrow = change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '';
+    changeEl.className = 'stat-bel20-change ' + dir;
+    changeEl.textContent = arrow + ' ' + Math.abs(changePct).toFixed(2) + '%';
+
+    // Sparkline
+    const closes = result.indicators.quote[0].close;
+    const points = closes ? closes.filter(v => v !== null) : [];
+    if (points.length > 1) drawBel20Sparkline(points, dir);
+  } catch (e) {
+    console.warn('BEL20 ophalen mislukt:', e);
+    document.getElementById('bel20Value').textContent = '\u2014';
+    document.getElementById('bel20Change').textContent = '';
+  }
+}
+
+function drawBel20Sparkline(points, dir) {
+  const canvas = document.getElementById('bel20Sparkline');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0, 0, w, h);
+
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const pad = 1;
+
+  const color = dir === 'up' ? getComputedStyle(document.documentElement).getPropertyValue('--sage').trim()
+              : dir === 'down' ? getComputedStyle(document.documentElement).getPropertyValue('--coral').trim()
+              : getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim();
+
+  // Draw line
+  ctx.beginPath();
+  points.forEach((v, i) => {
+    const x = (i / (points.length - 1)) * w;
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Fill gradient under line
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.restore();
+}
+
+// ─── BEL20 INDIVIDUELE AANDELEN ─────────────────────────────────────
+// BEL20-samenstelling — laatst gecontroleerd: 2026-03-27
+// Bron: Euronext (https://live.euronext.com/nl/product/indices/BE0389555039-XBRU/market-information)
+// Herziening: jaarlijks in maart. Pas deze lijst aan bij wijzigingen.
+const BEL20_STOCKS = [
+  { symbol: 'ABI.BR',   name: 'AB InBev' },
+  { symbol: 'ACKB.BR',  name: 'Ackermans' },
+  { symbol: 'AED.BR',   name: 'Aedifica' },
+  { symbol: 'AGS.BR',   name: 'Ageas' },
+  { symbol: 'APAM.AS',  name: 'Aperam' },
+  { symbol: 'ARGX.BR',  name: 'argenx' },
+  { symbol: 'AZE.BR',   name: 'Azelis' },
+  { symbol: 'DIE.BR',   name: "D'Ieteren" },
+  { symbol: 'ELI.BR',   name: 'Elia' },
+  { symbol: 'GBLB.BR',  name: 'GBL' },
+  { symbol: 'KBC.BR',   name: 'KBC' },
+  { symbol: 'LOTB.BR',  name: 'Lotus Bakeries' },
+  { symbol: 'MELE.BR',  name: 'Melexis' },
+  { symbol: 'MONT.BR',  name: 'Montea' },
+  { symbol: 'SOF.BR',   name: 'Sofina' },
+  { symbol: 'SOLB.BR',  name: 'Solvay' },
+  { symbol: 'SYENS.BR', name: 'Syensqo' },
+  { symbol: 'UCB.BR',   name: 'UCB' },
+  { symbol: 'UMI.BR',   name: 'Umicore' },
+  { symbol: 'WDP.BR',   name: 'WDP' }
+];
+
+async function fetchBel20Stocks() {
+  const symbols = BEL20_STOCKS.map(s => s.symbol).join(',');
+  const url = 'https://query1.finance.yahoo.com/v8/finance/spark?symbols=' + encodeURIComponent(symbols) + '&range=1d&interval=5m&_cb=' + Date.now();
+  try {
+    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(url), { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    const stocks = BEL20_STOCKS.map(stock => {
+      const spark = data[stock.symbol];
+      if (!spark || !spark.close || !spark.close.length) return null;
+
+      const closes = spark.close.filter(v => v !== null);
+      if (!closes.length) return null;
+
+      const price = closes[closes.length - 1];
+      const prevClose = spark.chartPreviousClose || spark.previousClose || closes[0];
+      const change = price - prevClose;
+      const changePct = prevClose ? (change / prevClose) * 100 : 0;
+
+      return {
+        name: stock.name,
+        symbol: stock.symbol,
+        price,
+        changePct,
+        dir: change > 0 ? 'up' : change < 0 ? 'down' : 'flat'
+      };
+    }).filter(Boolean);
+
+    renderBel20Stocks(stocks);
+  } catch (e) {
+    console.warn('BEL20 aandelen ophalen mislukt:', e.message);
+    document.getElementById('stocksGrid').innerHTML = '<div class="verkeer-empty">Niet beschikbaar</div>';
+  }
+}
+
+function renderBel20Stocks(stocks) {
+  const grid = document.getElementById('stocksGrid');
+
+  // Sorteer op absolute wijziging (grootste beweeglijkheid eerst)
+  stocks.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
+
+  grid.innerHTML = stocks.map(s => {
+    const arrow = s.dir === 'up' ? '\u25B2' : s.dir === 'down' ? '\u25BC' : '';
+    const priceStr = s.price.toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const changeStr = arrow + ' ' + Math.abs(s.changePct).toFixed(2) + '%';
+    return '<div class="stock-row">' +
+      '<span class="stock-name">' + s.name + '</span>' +
+      '<span class="stock-price">' + priceStr + '</span>' +
+      '<span class="stock-change ' + s.dir + '">' + changeStr + '</span>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('stocksUpdated').textContent =
+    'Bijgewerkt ' + new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── INTERACTIONS ───────────────────────────────────────────────────
+function toggleSource(el) {
+  const s = el.dataset.source;
+  el.classList.toggle('active');
+  if (activeSources.has(s)) {
+    activeSources.delete(s);
+  } else {
+    activeSources.add(s);
+    if (GOOGLE_NEWS_SOURCES.has(s)) {
+      showToast('Mediahuis-bronnen via Google News — artikelen zijn niet strikt chronologisch');
+    }
+  }
+  render();
+}
+
+
+function showToast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg;
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── HELPERS ────────────────────────────────────────────────────────
+function hashString(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; } return 'a' + Math.abs(h).toString(36); }
+function escapeHtml(t) { const m = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }; return t.replace(/[&<>"']/g, c => m[c]); }
+function highlightSearch(html) { if (!searchQuery) return html; return html.replace(new RegExp('(' + searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>'); }
+function formatTimeAgo(d) { const m = Math.floor((Date.now() - d.getTime()) / 60000); if (m < 1) return 'nu'; if (m < 60) return m + 'm'; const h = Math.floor(m / 60); if (h < 24) return h + 'u'; return Math.floor(h / 24) + 'd'; }
+
+// ─── STREAM BAR ─────────────────────────────────────────────────────
+const streamPlayers = [];
+let modalHls = null;
+
+function attachHls(video, url) {
+  if (Hls.isSupported()) {
+    const hls = new Hls({
+      maxBufferLength: 10,
+      maxMaxBufferLength: 20,
+      xhrSetup: function(xhr, reqUrl) {
+        // Proxy only AES key requests blocked by CORS
+        if (reqUrl.includes('/keys/')) {
+          xhr.open('GET', 'https://corsproxy.io/?' + encodeURIComponent(reqUrl), true);
+        }
+      }
+    });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    return hls;
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+    return null;
+  }
+}
+
+function renderStreamBar() {
+  const container = document.getElementById('streamChannels');
+  container.innerHTML = '';
+  streamPlayers.forEach(h => { if (h) h.destroy(); });
+  streamPlayers.length = 0;
+
+  CONFIG.streams.forEach((stream, i) => {
+    const ch = document.createElement('div');
+    ch.className = 'stream-channel';
+    ch.onclick = () => openStreamModal(i);
+
+    const video = document.createElement('video');
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+
+    const label = document.createElement('div');
+    label.className = 'stream-channel-label';
+    label.innerHTML =
+      '<span class="stream-channel-dot"></span>' +
+      '<span class="stream-channel-name">' + escapeHtml(stream.name) + '</span>' +
+      '<span class="stream-channel-expand">&#x26F6;</span>';
+
+    ch.appendChild(video);
+    ch.appendChild(label);
+    container.appendChild(ch);
+
+    const hls = attachHls(video, stream.hlsUrl);
+    streamPlayers.push(hls);
+    video.play().catch(() => {});
+  });
+}
+
+function openStreamModal(index) {
+  const stream = CONFIG.streams[index];
+  if (!stream) return;
+  document.getElementById('streamModalTitle').textContent = stream.name + ' — LIVE';
+  const video = document.getElementById('streamModalVideo');
+  if (modalHls) { modalHls.destroy(); modalHls = null; }
+  modalHls = attachHls(video, stream.hlsUrl);
+  video.muted = false;
+  video.play().catch(() => {});
+  document.getElementById('streamModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeStreamModal() {
+  document.getElementById('streamModal').classList.remove('open');
+  const video = document.getElementById('streamModalVideo');
+  video.pause();
+  if (modalHls) { modalHls.destroy(); modalHls = null; }
+  video.removeAttribute('src');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('streamModal').addEventListener('click', function(e) {
+  if (e.target === this) closeStreamModal();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('streamModal').classList.contains('open')) {
+    closeStreamModal();
+  }
+});
+
+// ─── INIT ───────────────────────────────────────────────────────────
+async function init() {
+  // Detect file:// protocol — fetch won't work
+  if (location.protocol === 'file:') {
+    document.getElementById('feed').innerHTML = '<div class="empty-state" style="text-align:left;padding:24px">' +
+      '<strong style="font-family:var(--font-title);font-size:16px">Lokale server vereist</strong><br><br>' +
+      '<span style="color:var(--text-sub)">Dit dashboard kan niet draaien via file:// wegens CORS-restricties.<br>Start een lokale server:</span><br><br>' +
+      '<code style="background:var(--rule-light);padding:4px 8px;font-size:12px">python3 -m http.server 8080</code><br><br>' +
+      '<span style="color:var(--text-sub)">Open daarna </span><code style="background:var(--rule-light);padding:2px 6px;font-size:12px">http://localhost:8080</code>' +
+      '</div>';
+    return;
+  }
+
+  const cached = loadCachedFeeds();
+  if (cached) { allArticles = cached.articles; render(); document.getElementById('lastUpdate').textContent = 'cache (' + Math.floor((Date.now() - cached.timestamp) / 60000) + 'm)'; }
+  const fresh = await fetchAllFeeds();
+  if (fresh.length > 0) allArticles = fresh;
+  render();
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  // Google Trends, BEL20, Verkeer & Streams
+  fetchGoogleTrends().then(t => renderGoogleTrends(t)).catch(e => console.warn('Trends render fout:', e));
+  fetchBel20();
+  fetchBel20Stocks();
+  fetchVerkeer();
+  renderStreamBar();
+
+  // BEL20 ververst elke 2 minuten, Verkeer elke minuut
+  setInterval(() => fetchBel20(), 2 * 60 * 1000);
+  setInterval(() => fetchBel20Stocks(), 2 * 60 * 1000);
+  setInterval(() => fetchVerkeer(), 60 * 1000);
+
+  setInterval(async () => {
+    const a = await fetchAllFeeds();
+    if (a.length > 0) { allArticles = a; render(); document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    fetchGoogleTrends().then(t => renderGoogleTrends(t)).catch(e => console.warn('Trends render fout:', e));
+  }, CONFIG.refreshInterval);
+}
+
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => { searchQuery = e.target.value.trim().toLowerCase(); render(); }, 200);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.getElementById('streamModal').classList.contains('open')) return; document.getElementById('searchInput').value = ''; searchQuery = ''; render(); } });
+
+init();
+
+// Dashboard slide: wheel on stream bar scrolls the entire dashboard up/down
+(function() {
+  const wrapper = document.getElementById('dashboardContent');
+  const streamBar = document.querySelector('.stream-bar');
+  let offset = 0;
+  const speed = 1.5;
+
+  function getMaxOffset() {
+    const stocksSection = document.getElementById('stocksSection');
+    const stocksHeight = stocksSection ? stocksSection.offsetHeight : 0;
+    return window.innerHeight - streamBar.offsetHeight + stocksHeight;
+  }
+
+  function applyOffset() {
+    wrapper.style.transform = offset === 0 ? '' : `translateY(-${offset}px)`;
+  }
+
+  function onWheel(e) {
+    e.preventDefault();
+    const max = getMaxOffset();
+    offset = Math.max(0, Math.min(max, offset + e.deltaY * speed));
+    applyOffset();
+  }
+
+  streamBar.addEventListener('wheel', onWheel, { passive: false });
+  document.getElementById('stocksSection').addEventListener('wheel', onWheel, { passive: false });
+})();
+</script>
+</body>
+</html>
