@@ -39,6 +39,17 @@ render() pipeline:
   4. HTML-generatie (string concatenation, innerHTML)
   5. Sidebar-updates (trending, betrouwbaarheid)
 
+ADSB.lol API (luchtverkeer boven België)
+        │
+        ▼
+fetchFlights() — direct fetch, fallback via corsproxy.io
+        │
+        ▼
+renderFlights() → Leaflet markers (divIcon SVG-pijltjes, roteren op track)
+        │
+        ▼
+Kaart onderaan tweede pagina (onder BEL20-aandelen), verversing elke 12s
+
 Yahoo Finance API (BEL20 / ^BFX)
         │
         ▼
@@ -110,6 +121,36 @@ Toont de huidige BEL20-indexwaarde, dagwijziging (%) en een intraday sparkline-g
 - **Sidebar** (bovenste sectie "BEL20 Intraday"): canvas sparkline over volle breedte. Lijn + gradient-fill, kleur volgt stijging/daling. Getekend via `drawBel20Sparkline()` op een `<canvas>` element dat dynamisch schaalt naar de containerbreedte (via `getBoundingClientRect()`). HiDPI-ondersteuning via `devicePixelRatio`.
 
 **Verversing:** eigen interval van 2 minuten (losgekoppeld van de 5-minuten RSS-refresh).
+
+### Vluchtkaart (ADSB.lol)
+
+Live kaart van België met alle vliegtuigen die er op dat moment overvliegen. Gepositioneerd onderaan de tweede pagina (onder BEL20-aandelen), gecentreerd op max-width 900px.
+
+**Technologie:** Leaflet 1.9.4 (via `cdn.jsdelivr.net`) met CartoDB Dark Matter tiles. Vliegtuigen worden weergegeven als SVG-pijltjes (`divIcon`) in `--teal` kleur die roteren op basis van het `track`-veld (koers in graden). Hover-tooltip toont callsign · vliegtuigtype · hoogte in ft · snelheid in kts.
+
+**Databron:** ADSB.lol community ADS-B aggregator — gratis, geen API key.
+```
+https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/150
+```
+150 nautische mijl radius rond Brussel — dekt heel België plus directe buurlanden.
+
+**CORS-aanpak:** De API stuurt geen `access-control-allow-origin` header vanuit de browser. `fetchFlights()` probeert eerst direct, valt bij fout terug op corsproxy.io. Beide paden leveren hetzelfde JSON-formaat.
+
+**Lazy initialisatie:** De Leaflet-kaart wordt pas aangemaakt op het eerste scroll-event (`applyOffset()`), niet bij `init()`. Dit voorkomt dat Leaflet initialiseert met een container die nog buiten het `overflow:hidden` viewport valt (en dan een grootte van 0×0 zou rapporteren). Na initialisatie volgt onmiddellijk een `requestAnimationFrame` met `invalidateSize()` zodat tiles correct laden.
+
+**Verversing:** eigen interval van 12 seconden. Vliegtuigen die verdwijnen uit de API-response worden direct van de kaart verwijderd.
+
+**Relevante velden per vliegtuig (ADSB.lol JSON):**
+
+| Veld | Betekenis |
+|------|-----------|
+| `lat`, `lon` | Positie |
+| `track` | Koers in graden (0 = noord) — gebruikt voor rotatie icon |
+| `alt_baro` / `alt_geom` | Hoogte in feet |
+| `gs` | Grondsnelheid in knots |
+| `flight` | Callsign (bijv. `BAW123`) |
+| `t` | ICAO vliegtuigtype (bijv. `A320`) |
+| `hex` | ICAO hex-adres — gebruikt als marker-ID |
 
 ### Livestream bar
 
@@ -231,6 +272,14 @@ Artikel-ID's worden gegenereerd via een simpele string-hash (`hashString()`) van
 │  STREAM BAR (fixed bottom, 140px): LIVE label + 8 videostreams   │
 └───────────────────────────────────────────────────────────────────┘
   ▲ progress bar (2px teal, fixed top)
+
+── TWEEDE PAGINA (scrollen via stream bar of stocks) ───────────────
+┌───────────────────────────────────────────────────────────────────┐
+│  BEL20 AANDELEN: grid met alle 20 BEL20-componenten              │
+├───────────────────────────────────────────────────────────────────┤
+│  VLUCHTKAART (gecentreerd, max-width 900px, 480px hoog)          │
+│  Leaflet + CartoDB Dark Matter · ADSB.lol · verversing 12s       │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ## Designsysteem

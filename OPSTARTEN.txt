@@ -6,7 +6,7 @@ OSINT Nieuwsdashboard opstarten
 
 2. Navigeer naar de projectmap
    Typ het volgende en druk op Enter:
-   cd "/Users/brink/Lokaal/OSINT dashboard"
+   cd "/Users/brink/Lokaal/loep"
 
 3. Start de server
    Typ het volgende en druk op Enter:

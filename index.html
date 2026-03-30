@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js" crossorigin=""></script>
 <style>
 /* ─── TOKENS ────────────────────────────────────────────────────── */
 :root {
@@ -974,6 +976,107 @@ mark {
 .stock-change.down { color: var(--coral); }
 .stock-change.flat { color: var(--text-dim); }
 
+/* ─── VLUCHTKAART ───────────────────────────────────────────────── */
+.flightmap-section {
+  padding: 24px 40px 48px;
+  background: var(--bg);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.flightmap-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 6px;
+}
+
+.flightmap-header h3 {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.flightmap-meta {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flightmap-meta a { color: var(--teal); text-decoration: none; }
+.flightmap-meta a:hover { text-decoration: underline; }
+
+.flightmap-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flightmap-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+#flightMap {
+  width: 100%;
+  max-width: 900px;
+  height: 480px;
+  background: #0d0d10;
+}
+
+/* Leaflet donker thema */
+.aircraft-icon { background: transparent !important; border: none !important; }
+
+.flight-tooltip {
+  background: rgba(24,24,28,0.93) !important;
+  border: 1px solid var(--rule) !important;
+  border-radius: 0 !important;
+  color: var(--text) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  padding: 3px 8px !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+}
+.flight-tooltip::before { display: none !important; }
+
+.leaflet-container { background: #0d0d10; font-family: var(--font-ui); }
+.leaflet-control-attribution {
+  background: rgba(17,17,20,0.75) !important;
+  color: var(--text-dim) !important;
+  font-size: 8px !important;
+  font-family: var(--font-ui) !important;
+}
+.leaflet-control-attribution a { color: var(--text-dim) !important; }
+.leaflet-control-zoom a {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--rule) !important;
+  font-size: 14px !important;
+  line-height: 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+.leaflet-control-zoom a:hover { background: var(--rule) !important; }
+.leaflet-bar { border: 1px solid var(--rule) !important; box-shadow: none !important; }
+
 /* ─── RESPONSIVE ────────────────────────────────────────────────── */
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
@@ -1082,6 +1185,16 @@ mark {
   <div class="stocks-grid" id="stocksGrid">
     <div class="verkeer-empty">Laden...</div>
   </div>
+</div>
+<div class="flightmap-section" id="flightMapSection">
+  <div class="flightmap-header">
+    <h3>Luchtverkeer boven België</h3>
+    <span class="flightmap-meta">
+      <span class="flightmap-status"><span class="flightmap-dot"></span><span id="flightCount">—</span> toestellen</span>
+      · <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>
+    </span>
+  </div>
+  <div id="flightMap"></div>
 </div>
 </div><!-- /dashboardContent -->
 </div><!-- /dashboardWrapper -->
@@ -1894,6 +2007,118 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (docume
 
 init();
 
+// ─── VLUCHTKAART (ADSB.LOL) ─────────────────────────────────────────
+let flightMap = null;
+let flightMarkers = {};
+
+function makeAircraftIcon(track) {
+  const t = (track || 0);
+  return L.divIcon({
+    className: 'aircraft-icon',
+    html: '<div style="transform:rotate(' + t + 'deg);line-height:0;width:14px;height:14px">' +
+      '<svg width="14" height="14" viewBox="0 0 14 14">' +
+      '<polygon points="7,1 10.5,12 7,9.5 3.5,12" fill="#5a9ea2" stroke="#0d0d10" stroke-width="0.8"/>' +
+      '</svg></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  });
+}
+
+function initFlightMap() {
+  if (flightMap) return;
+  if (typeof L === 'undefined') { console.warn('Leaflet niet geladen'); return; }
+  flightMap = L.map('flightMap', {
+    center: [50.5, 4.5],
+    zoom: 8,
+    zoomControl: true,
+    attributionControl: true
+  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CartoDB</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(flightMap);
+  fetchFlights();
+  setInterval(fetchFlights, 12000);
+}
+
+const ADSB_URL = 'https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/150';
+
+async function fetchFlights() {
+  // Probeer direct (werkt als adsb.lol CORS-headers stuurt)
+  try {
+    const resp = await fetch(ADSB_URL, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    renderFlights(data.ac || []);
+    return;
+  } catch (e) {
+    // Direct geblokkeerd door CORS — val terug op proxy
+  }
+  // Fallback via corsproxy.io
+  try {
+    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(ADSB_URL), { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    renderFlights(data.ac || []);
+  } catch (e) {
+    console.warn('ADSB vluchtdata mislukt (direct + proxy):', e.message);
+  }
+}
+
+function renderFlights(aircraft) {
+  if (!flightMap) return;
+  const seen = new Set();
+  let count = 0;
+
+  aircraft.forEach(ac => {
+    if (!ac.lat || !ac.lon) return;
+    count++;
+    const id = ac.hex || (String(ac.lat) + ',' + String(ac.lon));
+    seen.add(id);
+
+    const callsign = ((ac.flight || '').trim()) || ac.r || '—';
+    const altRaw = ac.alt_baro !== undefined ? ac.alt_baro : (ac.alt_geom !== undefined ? ac.alt_geom : null);
+    const speed = Math.round(ac.gs || 0);
+    const type = (ac.t || '').trim();
+    const track = ac.track || 0;
+
+    const ttParts = [callsign];
+    if (type) ttParts.push('(' + type + ')');
+    if (altRaw !== null && altRaw !== 'ground') ttParts.push(Number(altRaw).toLocaleString('nl-BE') + ' ft');
+    else if (altRaw === 'ground') ttParts.push('grond');
+    if (speed) ttParts.push(speed + ' kts');
+    const tooltip = ttParts.join(' · ');
+
+    if (flightMarkers[id]) {
+      flightMarkers[id].setLatLng([ac.lat, ac.lon]);
+      flightMarkers[id].setIcon(makeAircraftIcon(track));
+      if (flightMarkers[id].getTooltip()) flightMarkers[id].getTooltip().setContent(tooltip);
+    } else {
+      const marker = L.marker([ac.lat, ac.lon], { icon: makeAircraftIcon(track) });
+      marker.bindTooltip(tooltip, {
+        permanent: false,
+        className: 'flight-tooltip',
+        direction: 'top',
+        offset: [0, -8]
+      });
+      marker.addTo(flightMap);
+      flightMarkers[id] = marker;
+    }
+  });
+
+  // Verwijder vliegtuigen die niet meer in de response zitten
+  Object.keys(flightMarkers).forEach(id => {
+    if (!seen.has(id)) {
+      flightMarkers[id].remove();
+      delete flightMarkers[id];
+    }
+  });
+
+  const el = document.getElementById('flightCount');
+  if (el) el.textContent = count;
+}
+
 // Dashboard slide: wheel on stream bar scrolls the entire dashboard up/down
 (function() {
   const wrapper = document.getElementById('dashboardContent');
@@ -1903,12 +2128,21 @@ init();
 
   function getMaxOffset() {
     const stocksSection = document.getElementById('stocksSection');
+    const flightMapSection = document.getElementById('flightMapSection');
     const stocksHeight = stocksSection ? stocksSection.offsetHeight : 0;
-    return window.innerHeight - streamBar.offsetHeight + stocksHeight;
+    const flightHeight = flightMapSection ? flightMapSection.offsetHeight : 0;
+    return window.innerHeight - streamBar.offsetHeight + stocksHeight + flightHeight;
   }
 
   function applyOffset() {
     wrapper.style.transform = offset === 0 ? '' : `translateY(-${offset}px)`;
+    if (offset > 0 && !flightMap) {
+      // Initialiseer kaart pas als de pagina begint te scrollen (container is dan zichtbaar)
+      initFlightMap();
+      requestAnimationFrame(() => { if (flightMap) flightMap.invalidateSize(); });
+    } else if (flightMap) {
+      flightMap.invalidateSize();
+    }
   }
 
   function onWheel(e) {
@@ -1920,6 +2154,7 @@ init();
 
   streamBar.addEventListener('wheel', onWheel, { passive: false });
   document.getElementById('stocksSection').addEventListener('wheel', onWheel, { passive: false });
+  document.getElementById('flightMapSection').addEventListener('wheel', onWheel, { passive: false });
 })();
 </script>
 </body>
