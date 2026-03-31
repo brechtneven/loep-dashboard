@@ -623,7 +623,6 @@ body {
 
 /* ─── STREAM BAR ───────────────────────────────────────────────── */
 #dashboardContent {
-  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
 .dashboard-viewport {
@@ -639,6 +638,41 @@ body {
   display: flex;
   align-items: stretch;
   z-index: 90;
+  position: relative;
+}
+
+.scroll-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.7;
+  pointer-events: none;
+  animation: scrollHintPulse 2.5s ease-in-out infinite;
+  z-index: 91;
+  transition: opacity 0.4s ease;
+}
+
+.scroll-hint.hidden { opacity: 0; }
+
+.scroll-hint svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: rgba(255,255,255,0.9);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+}
+
+@keyframes scrollHintPulse {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) translateY(0); }
+  50% { opacity: 0.4; transform: translateX(-50%) translateY(3px); }
 }
 
 .stream-bar-label {
@@ -976,6 +1010,46 @@ mark {
 .stock-change.down { color: var(--coral); }
 .stock-change.flat { color: var(--text-dim); }
 
+/* ─── PAGE 2 WRAPPER ───────────────────────────────────────────── */
+.page-2 {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+
+.scroll-hint-up {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  pointer-events: none;
+  animation: scrollHintUpPulse 2.5s ease-in-out infinite;
+  z-index: 91;
+  transition: opacity 0.4s ease;
+}
+
+.scroll-hint-up.hidden { opacity: 0; }
+
+.scroll-hint-up svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@keyframes scrollHintUpPulse {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) translateY(0); }
+  50% { opacity: 0.4; transform: translateX(-50%) translateY(-3px); }
+}
+
 /* ─── VLUCHTKAART ───────────────────────────────────────────────── */
 .flightmap-section {
   padding: 24px 40px 48px;
@@ -984,6 +1058,8 @@ mark {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  flex: 1;
 }
 
 .flightmap-header {
@@ -1175,8 +1251,15 @@ mark {
 <div class="stream-bar">
   <div class="stream-bar-label">LIVE</div>
   <div class="stream-channels" id="streamChannels"></div>
+  <div class="scroll-hint" id="scrollHint">
+    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
 </div>
 </div><!-- /dashboard-viewport -->
+<div class="page-2">
+<div class="scroll-hint-up" id="scrollHintUp">
+  <svg viewBox="0 0 24 24"><polyline points="6 15 12 9 18 15"/></svg>
+</div>
 <div class="stocks-section" id="stocksSection">
   <div class="stocks-header">
     <h3>BEL20 Aandelen</h3>
@@ -1196,6 +1279,7 @@ mark {
   </div>
   <div id="flightMap"></div>
 </div>
+</div><!-- /page-2 -->
 </div><!-- /dashboardContent -->
 </div><!-- /dashboardWrapper -->
 
@@ -2119,25 +2203,29 @@ function renderFlights(aircraft) {
   if (el) el.textContent = count;
 }
 
-// Dashboard slide: wheel on stream bar scrolls the entire dashboard up/down
+// Dashboard slide: wheel on stream bar / page 2 scrolls between pages with snap
 (function() {
   const wrapper = document.getElementById('dashboardContent');
   const streamBar = document.querySelector('.stream-bar');
+  const page2 = document.querySelector('.page-2');
+  const scrollHint = document.getElementById('scrollHint');
+  const scrollHintUp = document.getElementById('scrollHintUp');
   let offset = 0;
+  let snapTimer;
+  let lastDirection = 0; // -1 = omhoog, 1 = omlaag
   const speed = 1.5;
 
   function getMaxOffset() {
-    const stocksSection = document.getElementById('stocksSection');
-    const flightMapSection = document.getElementById('flightMapSection');
-    const stocksHeight = stocksSection ? stocksSection.offsetHeight : 0;
-    const flightHeight = flightMapSection ? flightMapSection.offsetHeight : 0;
-    return window.innerHeight - streamBar.offsetHeight + stocksHeight + flightHeight;
+    const page2Height = page2 ? page2.offsetHeight : 0;
+    return Math.max(page2Height, window.innerHeight);
   }
 
   function applyOffset() {
     wrapper.style.transform = offset === 0 ? '' : `translateY(-${offset}px)`;
+    // Verberg scroll-hint zodra gebruiker begint te scrollen
+    if (scrollHint) scrollHint.classList.toggle('hidden', offset > 0);
+    if (scrollHintUp) scrollHintUp.classList.toggle('hidden', offset === 0);
     if (offset > 0 && !flightMap) {
-      // Initialiseer kaart pas als de pagina begint te scrollen (container is dan zichtbaar)
       initFlightMap();
       requestAnimationFrame(() => { if (flightMap) flightMap.invalidateSize(); });
     } else if (flightMap) {
@@ -2145,16 +2233,34 @@ function renderFlights(aircraft) {
     }
   }
 
+  function snapToPage() {
+    const max = getMaxOffset();
+    // Al op een rustpunt? Niet snappen.
+    if (offset === 0 || offset === max) return;
+    // Snap op basis van scrollrichting: omhoog → pagina 1, omlaag → pagina 2
+    const target = lastDirection < 0 ? 0 : max;
+    offset = target;
+    wrapper.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+    applyOffset();
+    wrapper.addEventListener('transitionend', function handler() {
+      wrapper.style.transition = '';
+      wrapper.removeEventListener('transitionend', handler);
+    });
+  }
+
   function onWheel(e) {
     e.preventDefault();
     const max = getMaxOffset();
+    if (e.deltaY !== 0) lastDirection = e.deltaY > 0 ? 1 : -1;
     offset = Math.max(0, Math.min(max, offset + e.deltaY * speed));
+    wrapper.style.transition = '';
     applyOffset();
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(snapToPage, 180);
   }
 
   streamBar.addEventListener('wheel', onWheel, { passive: false });
-  document.getElementById('stocksSection').addEventListener('wheel', onWheel, { passive: false });
-  document.getElementById('flightMapSection').addEventListener('wheel', onWheel, { passive: false });
+  page2.addEventListener('wheel', onWheel, { passive: false });
 })();
 </script>
 </body>
