@@ -15,7 +15,7 @@ Het project draait als **single-file applicatie**. Alle logica zit in `<script>`
 ## Dataflow
 
 ```
-RSS feeds (VRT, HLN, De Morgen, DS*, HNB*)
+RSS feeds (VRT, HLN, De Morgen, DT, DS*, HNB*)
         │
         ▼
 corsproxy.io (CORS proxy, geeft ruwe XML terug — geen caching)
@@ -33,11 +33,34 @@ fetchAllFeeds() → Promise.allSettled → samengevoegd array
         │
         ▼
 render() pipeline:
+  0. Tijdfilter (artikelen ouder dan 24 uur worden weggegooid)
   1. Filter (actieve bronnen, zoekquery)
   2. Sorteer (nieuwste eerst)
   3. Deduplicatie (woordoverlap-groepering)
   4. HTML-generatie (string concatenation, innerHTML)
   5. Sidebar-updates (trending, betrouwbaarheid)
+
+Google Trends RSS (trends.google.com/trending/rss?geo=BE-VLG)
+        │
+        ▼
+allorigins.win (primair) / rss2json.com (fallback)
+        │
+        ▼
+fetchGoogleTrends() → top 10 trending topics + verkeersindicator
+        │
+        ▼
+Sidebar sectie "Google Trends Vlaanderen", verversing elke 5 min
+
+Verkeerscentrum.be DATEX II (verkeerscentrum.be/uitwisseling/datex2v3)
+        │
+        ▼
+Direct fetch (geen proxy nodig — CORS open)
+        │
+        ▼
+fetchVerkeer() → XML parsing → incidenten + totale filezwaarte
+        │
+        ▼
+Sidebar sectie "Verkeer Vlaanderen", verversing elke 5 min
 
 ADSB.lol API (luchtverkeer boven België)
         │
@@ -108,6 +131,33 @@ Signaleert terugkerende onderwerpen in de recentste 50 artikelen, volledig clien
 5. Merge hoofdletter-/kleine-lettervarianten, behoud de gekapitaliseerde versie als weergave
 6. Sorteer op frequentie, toon top 20 met minimum 2 voorkomens
 
+### Google Trends Vlaanderen
+
+Toont de top 10 trending zoekterms op Google in de Vlaamse regio, met een visuele verkeers­indicator per trend.
+
+**Databron:** Google Trends RSS feed (`trends.google.com/trending/rss?geo=BE-VLG`).
+
+**Proxy-strategie:** Primair via allorigins.win (geeft traffic-data mee), fallback naar rss2json.com (alleen titels). De proxy is nodig voor CORS.
+
+**Weergave:** Sidebar sectie "Google Trends Vlaanderen" — elke trending term op een rij met een horizontale balk die de relatieve populariteit weergeeft (schaal 0–max van de set).
+
+**Verversing:** elke 5 minuten, gekoppeld aan de RSS-refresh.
+
+### Verkeer Vlaanderen (DATEX II)
+
+Toont de actuele filedruk op Vlaamse wegen via het officiële DATEX II-protocol van het Verkeerscentrum.
+
+**Databron:** `https://www.verkeerscentrum.be/uitwisseling/datex2v3` — publieke XML-feed, geen API key nodig, geen CORS-blokkade.
+
+**Verwerking:** `fetchVerkeer()` parsed de XML rechtstreeks met DOMParser. Extraheert incidenten (type, locatie, beschrijving) en totaliseert de filelengte in kilometers.
+
+**Weergave:** Sidebar sectie "Verkeer Vlaanderen":
+- Totale filezwaarte in km op een balk (schaal 0–300 km, verzadigt op 100%)
+- Aantal actieve incidenten
+- Filenaam en locatie per incident
+
+**Verversing:** elke 5 minuten.
+
 ### BEL20-beursdata
 
 Toont de huidige BEL20-indexwaarde, dagwijziging (%) en een intraday sparkline-grafiek.
@@ -121,6 +171,18 @@ Toont de huidige BEL20-indexwaarde, dagwijziging (%) en een intraday sparkline-g
 - **Sidebar** (bovenste sectie "BEL20 Intraday"): canvas sparkline over volle breedte. Lijn + gradient-fill, kleur volgt stijging/daling. Getekend via `drawBel20Sparkline()` op een `<canvas>` element dat dynamisch schaalt naar de containerbreedte (via `getBoundingClientRect()`). HiDPI-ondersteuning via `devicePixelRatio`.
 
 **Verversing:** eigen interval van 2 minuten (losgekoppeld van de 5-minuten RSS-refresh).
+
+### BEL20 Aandelen (tweede pagina)
+
+Toont alle 20 componenten van de BEL20-index op de tweede pagina, gesorteerd op absolute dagwijziging (hoogste volatiliteit eerst).
+
+**Databron:** Yahoo Finance spark API (`/v8/finance/spark?symbols=...&interval=5m&range=1d`) via corsproxy.io. Alle 20 symbolen worden in één request opgehaald.
+
+**Samenstelling BEL20 (geverifieerd 2026-03-27):** AB InBev, Ageas, Aperam, arGEN-X, Cofinimmo, Colruyt, D'Ieteren, Elia, Galapagos, GBL, KBC, Proximus, Sofina, Solvay, Syensqo, Umicore, UCB, VGP, WDP, Warehouses De Pauw.
+
+**Weergave:** Grid-layout, elke cel toont ticker, naam, huidige koers, dagwijziging (%), en een mini-sparkline. Rood bij daling, groen bij stijging.
+
+**Verversing:** elke 2 minuten, samen met BEL20-index.
 
 ### Vluchtkaart (ADSB.lol)
 
@@ -198,6 +260,7 @@ Voorlopig uitgeschakeld (2026-03-26). Was: simpele tijdcontrole `Date.now() - ar
 | VRT NWS | `vrt.be/vrtnws/nl.rss.articles.xml` | Atom | corsproxy.io |
 | HLN | `hln.be/rss.xml` | RSS 2.0 | corsproxy.io |
 | De Morgen | `demorgen.be/rss.xml` | RSS 2.0 | corsproxy.io |
+| De Tijd | `tijd.be/rss/nieuws.xml` | RSS 2.0 | corsproxy.io |
 | De Standaard | `news.google.com/rss/search?q=site:standaard.be&hl=nl&gl=BE&ceid=BE:nl` | RSS 2.0 | corsproxy.io (tijdelijke workaround via Google News) |
 | Het Nieuwsblad | `news.google.com/rss/search?q=site:nieuwsblad.be&hl=nl&gl=BE&ceid=BE:nl` | RSS 2.0 | corsproxy.io (tijdelijke workaround via Google News) |
 
@@ -206,6 +269,8 @@ Voorlopig uitgeschakeld (2026-03-26). Was: simpele tijdcontrole `Date.now() - ar
 **Waarom niet rss2json.com:** cachet feeds tot ~1 uur, waardoor recente artikelen vertraagd binnenkomen. Vervangen op 2026-03-26.
 
 **Waarom niet allorigins.win:** bleek onbetrouwbaar — lege responses, timeouts.
+
+**De Tijd** heeft een werkende directe RSS-feed (`tijd.be/rss/nieuws.xml`, RSS 2.0) en is standaard ingeschakeld. Kleur: `--navy` (#5a6e8a).
 
 **Google News RSS als tijdelijke workaround (2026-03-26):** De Standaard en Het Nieuwsblad zijn niet rechtstreeks bereikbaar (Cloudflare-blokkade — zie hieronder). Als workaround worden Google News RSS-feeds gebruikt (`site:standaard.be` / `site:nieuwsblad.be`). Titels worden opgeschoond (suffix " - De Standaard" / " - Nieuwsblad" verwijderd in `fetchFeed()`). Links gaan via Google News redirects — niet rechtstreeks naar de bron. Sortering is niet strikt chronologisch maar op Google News-relevantie. Kleuren: `--slate` (#6878a0) voor DS, `--bronze` (#a07858) voor HNB. **Standaard uitgeschakeld** — gebruiker moet DS/HNB handmatig activeren via de toggles in de header. Bij activatie verschijnt een toast-waarschuwing dat deze bronnen niet chronologisch zijn.
 
@@ -266,7 +331,8 @@ Artikel-ID's worden gegenereerd via een simpele string-hash (`hashString()`) van
 │                                          │  SIDEBAR (sticky)      │
 │  FEED (max-width 720px)                  │  - BEL20 Intraday      │
 │  Artikelen gescheiden door witruimte     │  - Google Trends VL    │
-│  en dunne horizontale lijnen             │  - Trending            │
+│  en dunne horizontale lijnen             │  - Verkeer Vlaanderen  │
+│                                          │  - Trending            │
 │                                          │  - Bronbetrouwbaarheid │
 ├──────────────────────────────────────────┴────────────────────────┤
 │  STREAM BAR (fixed bottom, 140px): LIVE label + 8 videostreams   │
@@ -301,6 +367,7 @@ Datajournalistieke editorial stijl, geïnspireerd op The Pudding / FT / NYT.
 | `--sage` | #6b8f71 | Live-status dot, hoge betrouwbaarheid |
 | `--slate` | #6878a0 | De Standaard badge |
 | `--bronze` | #a07858 | Het Nieuwsblad badge |
+| `--navy` | #5a6e8a | De Tijd badge |
 | `--teal-dark` | #1e4d52 | Beschikbaar voor uitbreidingen |
 | `--teal-light` | #7ab5b8 | Beschikbaar voor uitbreidingen |
 
@@ -336,6 +403,8 @@ bronbadge → tijd → dedup-count → betrouwbaarheid% → kop (Source Serif) �
 | `dedupThreshold` | 0.55 | Minimale woordoverlap-score voor deduplicatie |
 | `sources.*.reliability` | per bron | Betrouwbaarheidsscore (0–100) voor de sidebar |
 
+**24-uur filter (hardcoded):** Artikelen ouder dan 24 uur worden vóór de render-stap gefilterd (`cutoff = Date.now() - 24 * 60 * 60 * 1000`). Dit is geen CONFIG-waarde maar een vaste drempel — toegevoegd omdat oudere artikelen de feed vervuilden bij bronnen die historische items in hun RSS bewaren.
+
 ## Uitgeschakelde features (2026-03-26)
 
 - **Breaking-detectie** — uitgeschakeld wegens onbetrouwbare timestamps van Google News-feeds. CSS blijft aanwezig.
@@ -345,7 +414,7 @@ bronbadge → tijd → dedup-count → betrouwbaarheid% → kop (Source Serif) �
 ## Conventies
 
 - UI-taal is **Nederlands** (Vlaams)
-- Geen externe JS-bibliotheken — alles vanilla (Google Fonts + hls.js als enige externe resources)
+- Geen externe JS-bibliotheken — alles vanilla (Google Fonts, hls.js en Leaflet.js als enige externe resources)
 - HTML wordt opgebouwd via string-arrays (`html.push()`) en `innerHTML` — geen virtuele DOM
 - Event handlers via inline `onclick` attributen voor eenvoud in een single-file context
 - CSS custom properties voor alle kleuren en fonts — thema-aanpassing via `:root`
