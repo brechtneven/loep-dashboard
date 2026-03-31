@@ -127,6 +127,7 @@ Signaleert terugkerende onderwerpen in de recentste 50 artikelen, volledig clien
 1. Combineer titel + samenvatting per artikel
 2. Splits op witruimte en leestekens
 3. Filter: woorden < 3 tekens, Nederlandse stopwoorden (`CONFIG.stopWords`), pure cijfers
+   - Stopwoordenlijst gebaseerd op [stopwords-iso/stopwords-nl](https://github.com/stopwords-iso/stopwords-nl) (MIT) — ~545 woorden. Geen eigen aanvullingen.
 4. Detecteer eigennamen via beginhoofdletter (heuristisch)
 5. Merge hoofdletter-/kleine-lettervarianten, behoud de gekapitaliseerde versie als weergave
 6. Sorteer op frequentie, toon top 20 met minimum 2 voorkomens
