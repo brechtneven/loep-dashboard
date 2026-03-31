@@ -1050,16 +1050,30 @@ mark {
   50% { opacity: 0.4; transform: translateX(-50%) translateY(-3px); }
 }
 
-/* ─── VLUCHTKAART ───────────────────────────────────────────────── */
-.flightmap-section {
+/* ─── PAGE 2 GRID ─────────────────────────────────────────────────── */
+.page-2-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
   padding: 24px 40px 48px;
   background: var(--bg);
   border-top: 1px solid var(--rule);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .page-2-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+/* ─── VLUCHTKAART ───────────────────────────────────────────────── */
+.flightmap-section {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
 }
 
 .flightmap-header {
@@ -1176,6 +1190,168 @@ mark {
 .leaflet-control-zoom a:hover { background: var(--rule) !important; }
 .leaflet-bar { border: 1px solid var(--rule) !important; box-shadow: none !important; }
 
+/* ─── NMBS WIDGET ─────────────────────────────────────────────────── */
+.nmbs-section {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+}
+
+.nmbs-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule-light);
+}
+
+.nmbs-header h3 {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.nmbs-meta {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nmbs-meta a { color: var(--teal); text-decoration: none; }
+.nmbs-meta a:hover { text-decoration: underline; }
+
+.nmbs-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nmbs-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+.nmbs-stats {
+  padding: 12px;
+  border-bottom: 1px solid var(--rule-light);
+}
+
+.nmbs-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+}
+
+.nmbs-stat-row.highlight {
+  background: rgba(90, 158, 162, 0.08);
+  margin: 4px -12px;
+  padding: 6px 12px;
+}
+
+.nmbs-stat-label {
+  color: var(--text-sub);
+}
+
+.nmbs-stat-value {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.nmbs-stat-value.alert { color: var(--coral); }
+.nmbs-stat-value.ok { color: var(--sage); }
+
+.nmbs-alerts {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.nmbs-alerts-header {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--rule-light);
+}
+
+.nmbs-alerts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+  max-height: 240px;
+}
+
+.nmbs-alert {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--rule-light);
+  font-family: var(--font-ui);
+  font-size: 10px;
+}
+
+.nmbs-alert:last-child { border-bottom: none; }
+
+.nmbs-alert-route {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.nmbs-alert-type {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 4px;
+  margin-bottom: 2px;
+}
+
+.nmbs-alert-type.suspension { background: var(--coral); color: #fff; }
+.nmbs-alert-type.delay { background: var(--ochre); color: #fff; }
+.nmbs-alert-type.reduced { background: var(--text-dim); color: var(--bg); }
+
+.nmbs-alert-desc {
+  color: var(--text-sub);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.nmbs-loading {
+  padding: 12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.nmbs-empty {
+  padding: 12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 /* ─── RESPONSIVE ────────────────────────────────────────────────── */
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
@@ -1288,21 +1464,57 @@ mark {
     <div class="verkeer-empty">Laden...</div>
   </div>
 </div>
-<div class="flightmap-section" id="flightMapSection">
-  <div class="flightmap-header">
-    <h3>Luchtverkeer boven België</h3>
-    <span class="flightmap-meta">
-      <span class="flightmap-status"><span class="flightmap-dot"></span><span id="flightCount">—</span> toestellen</span>
-      · <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>
-    </span>
+<div class="page-2-grid" id="page2Grid">
+  <div class="flightmap-section" id="flightMapSection">
+    <div class="flightmap-header">
+      <h3>Luchtverkeer boven België</h3>
+      <span class="flightmap-meta">
+        <span class="flightmap-status"><span class="flightmap-dot"></span><span id="flightCount">—</span> toestellen</span>
+        · <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>
+      </span>
+    </div>
+    <div id="flightMap"></div>
+    <div class="flight-legend" id="flightLegend">
+      <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#5a9ea2"></span>Lijnvlucht <span class="flight-legend-count" id="flCntAirline">0</span></span>
+      <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c4a35a"></span>Cargo <span class="flight-legend-count" id="flCntCargo">0</span></span>
+      <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c0695e"></span>Militair <span class="flight-legend-count" id="flCntMilitary">0</span></span>
+      <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#8a7ea2"></span>Helikopter <span class="flight-legend-count" id="flCntHeli">0</span></span>
+      <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#6e7a85"></span>Overig <span class="flight-legend-count" id="flCntOther">0</span></span>
+    </div>
   </div>
-  <div id="flightMap"></div>
-  <div class="flight-legend" id="flightLegend">
-    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#5a9ea2"></span>Lijnvlucht <span class="flight-legend-count" id="flCntAirline">0</span></span>
-    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c4a35a"></span>Cargo <span class="flight-legend-count" id="flCntCargo">0</span></span>
-    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c0695e"></span>Militair <span class="flight-legend-count" id="flCntMilitary">0</span></span>
-    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#8a7ea2"></span>Helikopter <span class="flight-legend-count" id="flCntHeli">0</span></span>
-    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#6e7a85"></span>Overig <span class="flight-legend-count" id="flCntOther">0</span></span>
+  
+  <div class="nmbs-section" id="nmbsSection">
+    <div class="nmbs-header">
+      <h3>Spoornet Status</h3>
+      <span class="nmbs-meta">
+        <span class="nmbs-status"><span class="nmbs-dot"></span><span id="nmbsLastUpdate">—</span></span>
+        · <a href="https://docs.irail.be" target="_blank" rel="noopener">iRail</a>
+      </span>
+    </div>
+    <div class="nmbs-stats" id="nmbsStats">
+      <div class="nmbs-stat-row">
+        <span class="nmbs-stat-label">Ritten op net</span>
+        <span class="nmbs-stat-value" id="nmbsActiveTrains">—</span>
+      </div>
+      <div class="nmbs-stat-row">
+        <span class="nmbs-stat-label">Met vertraging</span>
+        <span class="nmbs-stat-value" id="nmbsDelayedTrains">—</span>
+      </div>
+      <div class="nmbs-stat-row highlight">
+        <span class="nmbs-stat-label">Totale achterstand</span>
+        <span class="nmbs-stat-value" id="nmbsTotalDelay">—</span>
+      </div>
+      <div class="nmbs-stat-row">
+        <span class="nmbs-stat-label">Gemiddelde vertraging</span>
+        <span class="nmbs-stat-value" id="nmbsAvgDelay">—</span>
+      </div>
+    </div>
+    <div class="nmbs-alerts" id="nmbsAlerts">
+      <div class="nmbs-alerts-header">Actuele storingen</div>
+      <div class="nmbs-alerts-list" id="nmbsAlertsList">
+        <div class="nmbs-loading">Laden...</div>
+      </div>
+    </div>
   </div>
 </div>
 </div><!-- /page-2 -->
@@ -2130,17 +2342,19 @@ async function init() {
   render();
   document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  // Google Trends, BEL20, Verkeer & Streams
+  // Google Trends, BEL20, Verkeer, NMBS & Streams
   fetchGoogleTrends().then(t => renderGoogleTrends(t)).catch(e => console.warn('Trends render fout:', e));
   fetchBel20();
   fetchBel20Stocks();
   fetchVerkeer();
+  fetchNMBSData();
   renderStreamBar();
 
-  // BEL20 ververst elke 2 minuten, Verkeer elke minuut
+  // BEL20 ververst elke 2 minuten, Verkeer elke minuut, NMBS elke 2 minuten
   setInterval(() => fetchBel20(), 2 * 60 * 1000);
   setInterval(() => fetchBel20Stocks(), 2 * 60 * 1000);
   setInterval(() => fetchVerkeer(), 60 * 1000);
+  setInterval(() => fetchNMBSData(), 2 * 60 * 1000);
 
   setInterval(async () => {
     const a = await fetchAllFeeds();
@@ -2157,6 +2371,105 @@ document.getElementById('searchInput').addEventListener('input', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.getElementById('streamModal').classList.contains('open')) return; document.getElementById('searchInput').value = ''; searchQuery = ''; render(); } });
 
 init();
+
+// ─── NMBS WIDGET (iRail API) ────────────────────────────────────────
+// Liveboards van grote knooppunten, gededupliceerd op voertuig-ID
+const NMBS_STATIONS = [
+  'Brussel-Zuid', 'Brussel-Noord', 'Antwerpen-Centraal',
+  'Gent-Sint-Pieters', 'Leuven', 'Liege-Guillemins',
+  'Charleroi', 'Brugge', 'Namur', 'Mechelen'
+];
+const IRAIL_BASE = 'https://api.irail.be/v1';
+
+let nmbsRefreshTimer = null;
+
+async function fetchNMBSData() {
+  try {
+    // Liveboards + storingen parallel ophalen
+    const requests = NMBS_STATIONS.map(s =>
+      fetch(IRAIL_BASE + '/liveboard?station=' + encodeURIComponent(s) + '&format=json&lang=nl', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    );
+    requests.push(
+      fetch(IRAIL_BASE + '/disturbances?format=json&lang=nl', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    );
+
+    const results = await Promise.all(requests);
+    const disturbanceData = results.pop();
+    const liveboardResults = results;
+
+    // Dedupliceer op voertuig-ID, bewaar hoogste vertraging per trein
+    const vehicles = {};
+    liveboardResults.forEach(data => {
+      if (!data || !data.departures) return;
+      const deps = data.departures.departure || [];
+      deps.forEach(d => {
+        const id = d.vehicle;
+        const delay = parseInt(d.delay, 10) || 0;
+        const canceled = d.canceled === '1';
+        if (!vehicles[id] || delay > vehicles[id].delay) {
+          vehicles[id] = { delay, canceled, type: (d.vehicleinfo && d.vehicleinfo.type) || '' };
+        }
+      });
+    });
+
+    renderNMBSWidget(vehicles, disturbanceData);
+  } catch (e) {
+    console.warn('NMBS data ophalen mislukt:', e.message);
+    document.getElementById('nmbsAlertsList').innerHTML = '<div class="nmbs-empty">Niet beschikbaar</div>';
+  }
+}
+
+function renderNMBSWidget(vehicles, disturbanceData) {
+  const entries = Object.values(vehicles);
+  const totalTrains = entries.length;
+  const delayedEntries = entries.filter(v => v.delay > 0);
+  const delayedTrains = delayedEntries.length;
+  const canceledTrains = entries.filter(v => v.canceled).length;
+  const totalDelaySeconds = delayedEntries.reduce((sum, v) => sum + v.delay, 0);
+  const totalDelayMin = Math.floor(totalDelaySeconds / 60);
+  const avgDelayMin = delayedTrains > 0 ? Math.round(totalDelaySeconds / 60 / delayedTrains) : 0;
+
+  document.getElementById('nmbsActiveTrains').textContent = totalTrains.toLocaleString('nl-BE');
+
+  const delayedEl = document.getElementById('nmbsDelayedTrains');
+  delayedEl.textContent = delayedTrains.toLocaleString('nl-BE') + (canceledTrains > 0 ? ' (+' + canceledTrains + ' afgeschaft)' : '');
+  delayedEl.className = 'nmbs-stat-value' + (delayedTrains > 10 ? ' alert' : delayedTrains === 0 ? ' ok' : '');
+
+  document.getElementById('nmbsTotalDelay').textContent = totalDelayMin.toLocaleString('nl-BE') + ' min';
+  document.getElementById('nmbsAvgDelay').textContent = avgDelayMin + ' min';
+
+  // Storingen (filter "planned" eruit)
+  const alertsList = document.getElementById('nmbsAlertsList');
+
+  if (disturbanceData && disturbanceData.disturbance) {
+    const active = disturbanceData.disturbance.filter(d => d.type === 'disturbance');
+
+    if (active.length === 0) {
+      alertsList.innerHTML = '<div class="nmbs-empty">Geen actuele storingen</div>';
+    } else {
+      alertsList.innerHTML = active.slice(0, 8).map(d => {
+        const title = d.title || '';
+        const desc = d.description || '';
+        const isUnderbroken = /onderbroken|geen treinen|stilgelegd/i.test(title + desc);
+        const labelClass = isUnderbroken ? 'suspension' : 'delay';
+        const labelText = isUnderbroken ? 'Onderbroken' : 'Hinder';
+        return '<div class="nmbs-alert">' +
+          '<div class="nmbs-alert-route">' + escapeHtml(title) + '</div>' +
+          '<span class="nmbs-alert-type ' + labelClass + '">' + labelText + '</span>' +
+          '<div class="nmbs-alert-desc">' + escapeHtml(desc.substring(0, 120)) + (desc.length > 120 ? '...' : '') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } else {
+    alertsList.innerHTML = '<div class="nmbs-empty">Geen data beschikbaar</div>';
+  }
+
+  document.getElementById('nmbsLastUpdate').textContent = new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+}
 
 // ─── VLUCHTKAART (ADSB.LOL) ─────────────────────────────────────────
 let flightMap = null;

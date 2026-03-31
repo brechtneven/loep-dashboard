@@ -234,6 +234,31 @@ https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/250
 | `dbFlags` | Database flags — bit 0 = militair |
 | `category` | ADSB-emittercategorie (A1–A5, B1–B7, etc.) |
 
+### NMBS Spoornet Status (2026-03-31)
+
+Realtime status widget voor het Belgische spoornet, geplaatst op de tweede pagina **rechts naast de vluchtkaart**. Toont actieve ritten, vertragingen en storingen.
+
+**Databron:** iRail community API (`api.irail.be/v1`). Scraped de Hafas/NMBS-backend die ook de mobiele app en website voedt — geeft per-stop real-time vertragingen, in tegenstelling tot de officiële GTFS-RT feed die alleen terminal-stops rapporteert.
+
+- Liveboards: `GET /v1/liveboard?station={naam}&format=json&lang=nl`
+- Storingen: `GET /v1/disturbances?format=json&lang=nl`
+
+**Waarom niet GTFS-RT:** De officiële NMBS GTFS-RT TripUpdate feed (`api-management-discovery-production.azure-api.net`) levert alleen delay-data voor de eerste en laatste halte van elke rit (alle tussenstops hebben `scheduleRelationship: 2` / NO_DATA). Dit resulteerde in ~1 minuut totale vertraging voor het hele net — onrealistisch.
+
+**Aanpak:** Liveboards van 10 grote knooppuntstations worden parallel opgehaald: Brussel-Zuid, Brussel-Noord, Antwerpen-Centraal, Gent-Sint-Pieters, Leuven, Liège-Guillemins, Charleroi, Brugge, Namur, Mechelen. Resultaten worden gededupliceerd op voertuig-ID (`vehicle` veld), waarbij de hoogste vertraging per trein bewaard wordt.
+
+**Metrics:**
+| Metric | Berekening |
+|--------|------------|
+| Ritten op net | Unieke voertuig-ID's over alle liveboards |
+| Met vertraging | Treinen met `delay > 0` (+ apart: afgeschafte treinen) |
+| Totale achterstand | Σ(max delay per trein) / 60 seconden |
+| Gemiddelde vertraging | Totale achterstand / aantal vertraagde treinen |
+
+**Storingen:** iRail disturbances endpoint. Items met `type: "planned"` worden gefilterd. Overige alerts worden getoond met titel + beschrijving. Onderbrekingen (herkend via regex op "onderbroken", "geen treinen", "stilgelegd") krijgen een rode badge, overige een gele "Hinder" badge.
+
+**Verversing:** elke 2 minuten (11 parallelle API-calls per refresh — respecteert iRail fair use).
+
 ### Livestream bar
 
 Vaste balk (140px) onderaan het scherm met live TV-streams, OSINT-dashboardstijl.
@@ -362,10 +387,15 @@ Artikel-ID's worden gegenereerd via een simpele string-hash (`hashString()`) van
 ── TWEEDE PAGINA (scrollen via stream bar of stocks) ───────────────
 ┌───────────────────────────────────────────────────────────────────┐
 │  BEL20 AANDELEN: grid met alle 20 BEL20-componenten              │
-├───────────────────────────────────────────────────────────────────┤
-│  VLUCHTKAART (gecentreerd, max-width 900px, 480px hoog)          │
-│  Leaflet + CartoDB Dark Matter · ADSB.lol · verversing 12s       │
-└───────────────────────────────────────────────────────────────────┘
+├────────────────────────────────┬──────────────────────────────────┤
+│  VLUCHTKAART                   │  NMBS SPOORNET STATUS            │
+│  (max-width 900px)             │  (320px breed)                   │
+│  Leaflet + CartoDB Dark Matter │  - Ritten op net                 │
+│  ADSB.lol · verversing 12s     │  - Vertragingen                  │
+│                                │  - Totale achterstand            │
+│                                │  - Actuele storingen             │
+│                                │  Verversing: 60s                 │
+└────────────────────────────────┴──────────────────────────────────┘
 ```
 
 ## Designsysteem
