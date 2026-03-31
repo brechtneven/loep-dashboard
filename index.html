@@ -1194,11 +1194,7 @@ mark {
 <div class="stats-strip">
   <div class="stat">
     <span class="stat-number" id="statTotal">&mdash;</span>
-    <span class="stat-label">artikelen</span>
-  </div>
-  <div class="stat">
-    <span class="stat-number" id="statDedup">&mdash;</span>
-    <span class="stat-label">uniek</span>
+    <span class="stat-label">berichten in afgelopen 24 uur</span>
   </div>
   <a class="stat-bel20" id="bel20Stat" href="https://www.google.com/finance/quote/BEL20:INDEXEURO?hl=nl" target="_blank" rel="noopener" title="BEL20 — Bekijk op Google Finance" style="text-decoration:none">
     <div class="stat-bel20-row">
@@ -1508,15 +1504,16 @@ function extractTrending(articles) {
 // ─── RENDERING ──────────────────────────────────────────────────────
 function render() {
   const now = Date.now();
+  const cutoff = now - 24 * 60 * 60 * 1000;
   let filtered = allArticles.filter(a => {
     if (!activeSources.has(a.source)) return false;
+    if (a.timestamp < cutoff) return false;
     if (searchQuery) { const q = searchQuery.toLowerCase(); return a.title.toLowerCase().includes(q) || a.summary.toLowerCase().includes(q); }
     return true;
   });
   filtered.sort((a, b) => b.timestamp - a.timestamp);
   const groups = deduplicateArticles(filtered);
   document.getElementById('statTotal').textContent = filtered.length;
-  document.getElementById('statDedup').textContent = groups.length;
 
   const h = [];
   groups.forEach(group => {
