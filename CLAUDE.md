@@ -5,9 +5,10 @@ Modulair OSINT-nieuwsdashboard voor Vlaamse onderzoeksjournalisten. Eén enkel H
 ## Architectuur
 
 ```
-index.html          Volledige applicatie (HTML + CSS + JS)
+index.html              Volledige applicatie (HTML + CSS + JS)
+cors-proxy-worker.js    Cloudflare Worker CORS proxy (broncode)
 .claude/
-  launch.json       Dev-serverconfiguratie (python3 http.server :8081)
+  launch.json           Dev-serverconfiguratie (python3 http.server :8081)
 ```
 
 Het project draait als **single-file applicatie**. Alle logica zit in `<script>` en `<style>` blokken in `index.html`. Dit is een bewuste keuze: het bestand moet offline werken na eerste load en direct deelbaar zijn zonder tooling.
@@ -18,7 +19,7 @@ Het project draait als **single-file applicatie**. Alle logica zit in `<script>`
 RSS feeds (VRT, HLN, De Morgen, DT, DS*, HNB*)
         │
         ▼
-corsproxy.io (CORS proxy, geeft ruwe XML terug — geen caching)
+Eigen Cloudflare Worker CORS proxy (loep-proxy.brecht-neven.workers.dev)
         │
         ▼
 parseXMLFeed() — DOMParser verwerkt RSS 2.0 én Atom
@@ -43,7 +44,7 @@ render() pipeline:
 Google Trends RSS (trends.google.com/trending/rss?geo=BE-VLG)
         │
         ▼
-allorigins.win (primair) / rss2json.com (fallback)
+Eigen CORS proxy (zelfde Cloudflare Worker)
         │
         ▼
 fetchGoogleTrends() → top 10 trending topics + verkeersindicator
@@ -65,7 +66,7 @@ Sidebar sectie "Verkeer Vlaanderen", verversing elke 5 min
 ADSB.lol API (luchtverkeer boven België)
         │
         ▼
-fetchFlights() — direct fetch, fallback via corsproxy.io
+fetchFlights() — direct fetch, fallback via eigen CORS proxy
         │
         ▼
 renderFlights() → Leaflet markers (divIcon SVG-pijltjes, roteren op track)
@@ -76,7 +77,7 @@ Kaart onderaan tweede pagina (onder BEL20-aandelen), verversing elke 12s
 Yahoo Finance API (BEL20 / ^BFX)
         │
         ▼
-corsproxy.io → JSON (intraday 5m intervallen)
+Eigen CORS proxy → JSON (intraday 5m intervallen)
         │
         ▼
 fetchBel20() → stats strip (waarde + %) + drawBel20Sparkline() → sidebar canvas
@@ -138,7 +139,7 @@ Toont de top 10 trending zoekterms op Google in de Vlaamse regio, met een visuel
 
 **Databron:** Google Trends RSS feed (`trends.google.com/trending/rss?geo=BE-VLG`).
 
-**Proxy-strategie:** Primair via allorigins.win (geeft traffic-data mee), fallback naar rss2json.com (alleen titels). De proxy is nodig voor CORS.
+**Proxy-strategie:** Via eigen Cloudflare Worker CORS proxy. XML wordt direct geparsed. De proxy is nodig voor CORS.
 
 **Weergave:** Sidebar sectie "Google Trends Vlaanderen" — elke trending term op een rij met een horizontale balk die de relatieve populariteit weergeeft (schaal 0–max van de set).
 
@@ -163,7 +164,7 @@ Toont de actuele filedruk op Vlaamse wegen via het officiële DATEX II-protocol 
 
 Toont de huidige BEL20-indexwaarde, dagwijziging (%) en een intraday sparkline-grafiek.
 
-**Databron:** Yahoo Finance chart API (`/v8/finance/chart/%5EBFX?interval=5m&range=1d`) via corsproxy.io. Cache-buster (`_cb=timestamp`) voorkomt gecachte proxy-responses. Geeft JSON terug met intraday koersen (5-minuutintervallen) en metadata (regularMarketPrice, chartPreviousClose).
+**Databron:** Yahoo Finance chart API (`/v8/finance/chart/%5EBFX?interval=5m&range=1d`) via eigen CORS proxy. Cache-buster (`_cb=timestamp`) voorkomt gecachte proxy-responses. Geeft JSON terug met intraday koersen (5-minuutintervallen) en metadata (regularMarketPrice, chartPreviousClose).
 
 **Bekende vertraging:** Yahoo Finance gratis tier levert Euronext-data met ~15 minuten delay. Dit is niet te verbeteren zonder betaalde real-time datafeed.
 
@@ -177,7 +178,7 @@ Toont de huidige BEL20-indexwaarde, dagwijziging (%) en een intraday sparkline-g
 
 Toont alle 20 componenten van de BEL20-index op de tweede pagina, gesorteerd op absolute dagwijziging (hoogste volatiliteit eerst).
 
-**Databron:** Yahoo Finance spark API (`/v8/finance/spark?symbols=...&interval=5m&range=1d`) via corsproxy.io. Alle 20 symbolen worden in één request opgehaald.
+**Databron:** Yahoo Finance spark API (`/v8/finance/spark?symbols=...&interval=5m&range=1d`) via eigen CORS proxy. Alle 20 symbolen worden in één request opgehaald.
 
 **Samenstelling BEL20 (geverifieerd 2026-03-27):** AB InBev, Ageas, Aperam, arGEN-X, Cofinimmo, Colruyt, D'Ieteren, Elia, Galapagos, GBL, KBC, Proximus, Sofina, Solvay, Syensqo, Umicore, UCB, VGP, WDP, Warehouses De Pauw.
 
@@ -197,7 +198,7 @@ https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/250
 ```
 250 nautische mijl radius rond Brussel — dekt België, buurlanden en een groot deel van West-Europa.
 
-**CORS-aanpak:** De API stuurt geen `access-control-allow-origin` header vanuit de browser. `fetchFlights()` probeert eerst direct, valt bij fout terug op corsproxy.io. Beide paden leveren hetzelfde JSON-formaat.
+**CORS-aanpak:** De API stuurt geen `access-control-allow-origin` header vanuit de browser. `fetchFlights()` probeert eerst direct, valt bij fout terug op de eigen CORS proxy. Beide paden leveren hetzelfde JSON-formaat.
 
 **Lazy initialisatie:** De Leaflet-kaart wordt pas aangemaakt op het eerste scroll-event (`applyOffset()`), niet bij `init()`. Dit voorkomt dat Leaflet initialiseert met een container die nog buiten het `overflow:hidden` viewport valt (en dan een grootte van 0×0 zou rapporteren). Na initialisatie volgt onmiddellijk een `requestAnimationFrame` met `invalidateSize()` zodat tiles correct laden.
 
@@ -270,7 +271,7 @@ Vaste balk (140px) onderaan het scherm met live TV-streams, OSINT-dashboardstijl
 - Klik op een kanaal → modal overlay met grotere player, **geluid aan**, native browser controls
 - Modal sluit via "Sluiten" knop, klik buiten de modal, of Escape-toets
 - hls.js config: `maxBufferLength: 10, maxMaxBufferLength: 20` voor lager geheugengebruik
-- AES-128 key requests worden via corsproxy.io geproxied (`xhrSetup`) voor streams die CORS-beperkingen op keys hebben
+- AES-128 key requests worden via de eigen CORS proxy geproxied (`xhrSetup`) voor streams die CORS-beperkingen op keys hebben
 
 **Streams** (geconfigureerd in `CONFIG.streams[]`, volgorde: internationaal → nationaal → regionaal):
 
@@ -302,18 +303,16 @@ Voorlopig uitgeschakeld (2026-03-26). Was: simpele tijdcontrole `Date.now() - ar
 
 | Bron | URL | Formaat | Proxy |
 |------|-----|---------|-------|
-| VRT NWS | `vrt.be/vrtnws/nl.rss.articles.xml` | Atom | corsproxy.io |
-| HLN | `hln.be/rss.xml` | RSS 2.0 | corsproxy.io |
-| De Morgen | `demorgen.be/rss.xml` | RSS 2.0 | corsproxy.io |
-| De Tijd | `tijd.be/rss/nieuws.xml` | RSS 2.0 | corsproxy.io |
-| De Standaard | `news.google.com/rss/search?q=site:standaard.be&hl=nl&gl=BE&ceid=BE:nl` | RSS 2.0 | corsproxy.io (tijdelijke workaround via Google News) |
-| Het Nieuwsblad | `news.google.com/rss/search?q=site:nieuwsblad.be&hl=nl&gl=BE&ceid=BE:nl` | RSS 2.0 | corsproxy.io (tijdelijke workaround via Google News) |
+| VRT NWS | `vrt.be/vrtnws/nl.rss.articles.xml` | Atom | eigen CORS proxy |
+| HLN | `hln.be/rss.xml` | RSS 2.0 | eigen CORS proxy |
+| De Morgen | `demorgen.be/rss.xml` | RSS 2.0 | eigen CORS proxy |
+| De Tijd | `tijd.be/rss/nieuws.xml` | RSS 2.0 | eigen CORS proxy |
+| De Standaard | `news.google.com/rss/search?q=site:standaard.be&hl=nl&gl=BE&ceid=BE:nl` | RSS 2.0 | eigen CORS proxy (tijdelijke workaround via Google News) |
+| Het Nieuwsblad | `news.google.com/rss/search?q=site:nieuwsblad.be&hl=nl&gl=BE&ceid=BE:nl` | RSS 2.0 | eigen CORS proxy (tijdelijke workaround via Google News) |
 
-**Waarom corsproxy.io:** geeft feeds direct door zonder caching, zodat altijd de meest actuele artikelen getoond worden. De ruwe XML wordt client-side geparsed via `parseXMLFeed()` (DOMParser), die zowel RSS 2.0 als Atom aankan.
+**CORS proxy:** Eigen Cloudflare Worker (`loep-proxy.brecht-neven.workers.dev`), broncode in `cors-proxy-worker.js`. Geeft feeds direct door zonder caching. Alleen requests van `loep.info`, `www.loep.info` en `localhost:8081` worden geaccepteerd (`ALLOWED_ORIGINS`). Gratis tier: 100.000 requests/dag. De ruwe XML wordt client-side geparsed via `parseXMLFeed()` (DOMParser), die zowel RSS 2.0 als Atom aankan. De proxy-URL is configureerbaar via de `CORS_PROXY` constante bovenaan het script.
 
-**Waarom niet rss2json.com:** cachet feeds tot ~1 uur, waardoor recente artikelen vertraagd binnenkomen. Vervangen op 2026-03-26.
-
-**Waarom niet allorigins.win:** bleek onbetrouwbaar — lege responses, timeouts.
+**Waarom geen third-party proxies meer:** corsproxy.io blokkeerde requests toen het domein van `*.github.io` naar `loep.info` werd gewijzigd (2026-03-31). allorigins.win was onbetrouwbaar (lege responses, timeouts). rss2json.com cachete feeds tot ~1 uur.
 
 **De Tijd** heeft een werkende directe RSS-feed (`tijd.be/rss/nieuws.xml`, RSS 2.0) en is standaard ingeschakeld. Kleur: `--navy` (#5a6e8a).
 
