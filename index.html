@@ -1116,6 +1116,29 @@ mark {
   background: #0d0d10;
 }
 
+.flight-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.flight-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.flight-legend-swatch {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+}
+.flight-legend-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-sub);
+}
+
 /* Leaflet donker thema */
 .aircraft-icon { background: transparent !important; border: none !important; }
 
@@ -1274,6 +1297,13 @@ mark {
     </span>
   </div>
   <div id="flightMap"></div>
+  <div class="flight-legend" id="flightLegend">
+    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#5a9ea2"></span>Lijnvlucht <span class="flight-legend-count" id="flCntAirline">0</span></span>
+    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c4a35a"></span>Cargo <span class="flight-legend-count" id="flCntCargo">0</span></span>
+    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c0695e"></span>Militair <span class="flight-legend-count" id="flCntMilitary">0</span></span>
+    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#8a7ea2"></span>Helikopter <span class="flight-legend-count" id="flCntHeli">0</span></span>
+    <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#6e7a85"></span>Overig <span class="flight-legend-count" id="flCntOther">0</span></span>
+  </div>
 </div>
 </div><!-- /page-2 -->
 </div><!-- /dashboardContent -->
@@ -2132,16 +2162,131 @@ init();
 let flightMap = null;
 let flightMarkers = {};
 
-function makeAircraftIcon(track) {
+// ─── Vluchtclassificatie ─────────────────────────────────────────
+const FLIGHT_COLORS = {
+  airline:  '#5a9ea2',  // teal — lijnvluchten
+  cargo:    '#c4a35a',  // ochre — vrachtvluchten
+  military: '#c0695e',  // coral — militair
+  heli:     '#8a7ea2',  // paars — helikopters
+  other:    '#6e7a85'   // grijs — overig / privé
+};
+
+const CARGO_CALLSIGN_PREFIXES = [
+  'FDX','UPS','GTI','CLX','ABW','MPH','BOX','TAY','QYC','SQC',
+  'CAO','CKK','AHK','KAL','NCA','GEC','ICL','DHK','BCS','SOO',
+  'ABD','ETD','GSS','RCF','FWI','NPT','ASL','DAE','NCR','WLX'
+];
+
+const MILITARY_CALLSIGN_PREFIXES = [
+  'BAF','RRR','RFR','GAF','NAF','IAM','AME','CNV','RCH','DUKE',
+  'VIPER','RAGE','SPAR','JAKE','COBRA','NATO','FORTE','MMF',
+  'SVF','FAB','PLF','DAF','HUF','CZF','LAF','NOR','SWF',
+  'TUR','CFG','PAF','HAF','RAF','QID'
+];
+
+const MILITARY_TYPES = [
+  'F16','F35','F18','EF2K','EUFI','RAFALE','C130','C17','C5M',
+  'A400','KC135','KC46','E3CF','E3TF','A330MRTT','NH90','H160M',
+  'HAWK','PC7','PC9','PC12','PC21','T38','TEXAN','A10','A109',
+  'P3','P8A','MRTOA','GLOBALE','RQ4','MQ9','TYPHOON'
+];
+
+const HELI_TYPES = [
+  'EC35','EC45','EC55','EC75','H125','H135','H145','H155','H160',
+  'H175','H215','H225','AW09','AW39','AW69','AW89','AW101','AW139',
+  'AW169','AW189','B06','B105','B212','B214','B222','B230','B407',
+  'B412','B429','BK17','R22','R44','R66','S76','S92','NH90','A109',
+  'MD52','MD60','MD90','MD50','LAMA','AS32','AS33','AS35','AS50',
+  'AS55','AS65','S61','S64','S70','S70I','UH1','UH60','CH47','B505'
+];
+
+function classifyAircraft(ac) {
+  const cs = ((ac.flight || '') + (ac.r || '')).trim().toUpperCase();
+  const acType = (ac.t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cat = (ac.category || '').toUpperCase();
+
+  // Militair: dbFlags bit 0, of bekende prefixen/types
+  if (ac.dbFlags && (ac.dbFlags & 1)) return 'military';
+  if (MILITARY_CALLSIGN_PREFIXES.some(p => cs.startsWith(p))) return 'military';
+  if (MILITARY_TYPES.some(mt => acType.includes(mt))) return 'military';
+
+  // Helikopter: ADSB categorie A7, of bekende types
+  if (cat === 'A7' || cat === 'B1' || cat === 'B2') return 'heli';
+  if (HELI_TYPES.some(ht => acType === ht)) return 'heli';
+
+  // Cargo: bekende callsign-prefixen
+  if (CARGO_CALLSIGN_PREFIXES.some(p => cs.startsWith(p))) return 'cargo';
+
+  // Lijnvlucht: callsign met 3 letters + cijfers (ICAO-formaat) en grotere categorie
+  if (/^[A-Z]{3}\d/.test(cs) && ['A3','A4','A5'].includes(cat)) return 'airline';
+  // Grotere vliegtuigen zonder duidelijk callsign → vermoedelijk lijnvlucht
+  if (['A3','A4','A5'].includes(cat)) return 'airline';
+
+  return 'other';
+}
+
+const FLIGHT_LABELS = { airline: 'Lijnvlucht', cargo: 'Cargo', military: 'Militair', heli: 'Helikopter', other: 'Overig' };
+
+// ─── Registratie → landvlag ──────────────────────────────────────
+const REG_PREFIX_MAP = [
+  // Langere prefixen eerst zodat bv. "PH-" matcht vóór "P"
+  ['OO-','BE'],['PH-','NL'],['OE-','AT'],['OH-','FI'],['OY-','DK'],
+  ['EI-','IE'],['EW-','BY'],['ES-','EE'],['EP-','IR'],['EC-','ES'],
+  ['EK-','AM'],['ER-','MD'],['ET-','ET'],['LX-','LU'],['LN-','NO'],
+  ['LY-','LT'],['LZ-','BG'],['LV-','AR'],['HA-','HU'],['HB-','CH'],
+  ['HL-','KR'],['HS-','TH'],['HZ-','SA'],['SE-','SE'],['SP-','PL'],
+  ['SX-','GR'],['SU-','EG'],['TC-','TR'],['TF-','IS'],['TS-','TN'],
+  ['UK-','UZ'],['UR-','UA'],['UN-','KZ'],['VH-','AU'],['VT-','IN'],
+  ['VP-B','BM'],['VP-C','KY'],['VQ-B','BM'],['YR-','RO'],['YL-','LV'],
+  ['YU-','RS'],['ZS-','ZA'],['ZK-','NZ'],['9H-','MT'],['9M-','MY'],
+  ['9V-','SG'],['9A-','HR'],['9K-','KW'],['9N-','NP'],['5N-','NG'],
+  ['5B-','CY'],['4X-','IL'],['4K-','AZ'],['4R-','LK'],['A6-','AE'],
+  ['A7-','QA'],['A9C-','BH'],['AP-','PK'],['B-','CN'],['CC-','CL'],
+  ['CN-','MA'],['CP-','BO'],['CS-','PT'],['CU-','CU'],['C-','CA'],
+  ['D-','DE'],['F-','FR'],['G-','GB'],['I-','IT'],['JA-','JP'],
+  ['JY-','JO'],['J2-','DJ'],['N','US'],['PP-','BR'],['PR-','BR'],
+  ['PT-','BR'],['PK-','ID'],['P4-','AW'],['RA-','RU'],['RF-','RU'],
+  ['RP-','PH'],['S5-','SI'],['TI-','CR'],['XA-','MX'],['XB-','MX'],
+  ['XC-','MX'],['YI-','IQ'],['Z3-','MK'],['7T-','DZ'],['70-','DZ'],
+];
+
+function regToFlag(reg) {
+  if (!reg) return '';
+  const r = reg.toUpperCase().replace(/\s/g, '');
+  for (const [prefix, cc] of REG_PREFIX_MAP) {
+    if (r.startsWith(prefix)) {
+      return String.fromCodePoint(...[...cc].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+    }
+  }
+  return '';
+}
+
+function makeAircraftIcon(track, category) {
   const t = (track || 0);
+  const color = FLIGHT_COLORS[category] || FLIGHT_COLORS.other;
+  const size = category === 'military' ? 16 : category === 'heli' ? 12 : 14;
+  const half = size / 2;
+  // Helikopters krijgen een cirkelvorm, rest het standaard pijltje
+  let svg;
+  if (category === 'heli') {
+    svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+      '<circle cx="' + half + '" cy="' + half + '" r="' + (half - 1) + '" fill="' + color + '" stroke="#0d0d10" stroke-width="0.8"/>' +
+      '</svg>';
+  } else {
+    const pts = category === 'military'
+      ? (half + ',1 ' + (half + 4) + ',' + (size - 2) + ' ' + half + ',' + (size - 5) + ' ' + (half - 4) + ',' + (size - 2))
+      : '7,1 10.5,12 7,9.5 3.5,12';
+    const w = category === 'military' ? size : 14;
+    const h = category === 'military' ? size : 14;
+    svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
+      '<polygon points="' + pts + '" fill="' + color + '" stroke="#0d0d10" stroke-width="0.8"/>' +
+      '</svg>';
+  }
   return L.divIcon({
     className: 'aircraft-icon',
-    html: '<div style="transform:rotate(' + t + 'deg);line-height:0;width:14px;height:14px">' +
-      '<svg width="14" height="14" viewBox="0 0 14 14">' +
-      '<polygon points="7,1 10.5,12 7,9.5 3.5,12" fill="#5a9ea2" stroke="#0d0d10" stroke-width="0.8"/>' +
-      '</svg></div>',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7]
+    html: '<div style="transform:rotate(' + t + 'deg);line-height:0;width:' + size + 'px;height:' + size + 'px">' + svg + '</div>',
+    iconSize: [size, size],
+    iconAnchor: [half, half]
   });
 }
 
@@ -2151,6 +2296,9 @@ function initFlightMap() {
   flightMap = L.map('flightMap', {
     center: [50.5, 4.5],
     zoom: 8,
+    minZoom: 6,
+    maxBounds: [[44, -6], [56, 16]],
+    maxBoundsViscosity: 0.8,
     zoomControl: true,
     attributionControl: true
   });
@@ -2163,7 +2311,7 @@ function initFlightMap() {
   setInterval(fetchFlights, 12000);
 }
 
-const ADSB_URL = 'https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/150';
+const ADSB_URL = 'https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/250';
 
 async function fetchFlights() {
   // Probeer direct (werkt als adsb.lol CORS-headers stuurt)
@@ -2191,6 +2339,7 @@ function renderFlights(aircraft) {
   if (!flightMap) return;
   const seen = new Set();
   let count = 0;
+  const counts = { airline: 0, cargo: 0, military: 0, heli: 0, other: 0 };
 
   aircraft.forEach(ac => {
     if (!ac.lat || !ac.lon) return;
@@ -2198,13 +2347,19 @@ function renderFlights(aircraft) {
     const id = ac.hex || (String(ac.lat) + ',' + String(ac.lon));
     seen.add(id);
 
+    const category = classifyAircraft(ac);
+    counts[category]++;
+
     const callsign = ((ac.flight || '').trim()) || ac.r || '—';
     const altRaw = ac.alt_baro !== undefined ? ac.alt_baro : (ac.alt_geom !== undefined ? ac.alt_geom : null);
     const speed = Math.round(ac.gs || 0);
     const type = (ac.t || '').trim();
     const track = ac.track || 0;
 
-    const ttParts = [callsign];
+    const flag = regToFlag(ac.r);
+    const ttParts = [FLIGHT_LABELS[category]];
+    if (flag) ttParts.push(flag);
+    ttParts.push(callsign);
     if (type) ttParts.push('(' + type + ')');
     if (altRaw !== null && altRaw !== 'ground') ttParts.push(Number(altRaw).toLocaleString('nl-BE') + ' ft');
     else if (altRaw === 'ground') ttParts.push('grond');
@@ -2213,10 +2368,10 @@ function renderFlights(aircraft) {
 
     if (flightMarkers[id]) {
       flightMarkers[id].setLatLng([ac.lat, ac.lon]);
-      flightMarkers[id].setIcon(makeAircraftIcon(track));
+      flightMarkers[id].setIcon(makeAircraftIcon(track, category));
       if (flightMarkers[id].getTooltip()) flightMarkers[id].getTooltip().setContent(tooltip);
     } else {
-      const marker = L.marker([ac.lat, ac.lon], { icon: makeAircraftIcon(track) });
+      const marker = L.marker([ac.lat, ac.lon], { icon: makeAircraftIcon(track, category) });
       marker.bindTooltip(tooltip, {
         permanent: false,
         className: 'flight-tooltip',
@@ -2238,6 +2393,13 @@ function renderFlights(aircraft) {
 
   const el = document.getElementById('flightCount');
   if (el) el.textContent = count;
+
+  // Update legende-tellers
+  const ids = { airline: 'flCntAirline', cargo: 'flCntCargo', military: 'flCntMilitary', heli: 'flCntHeli', other: 'flCntOther' };
+  Object.keys(ids).forEach(k => {
+    const cel = document.getElementById(ids[k]);
+    if (cel) cel.textContent = counts[k];
+  });
 }
 
 // Dashboard slide: wheel on stream bar / page 2 scrolls between pages with snap
