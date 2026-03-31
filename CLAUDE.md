@@ -189,19 +189,35 @@ Toont alle 20 componenten van de BEL20-index op de tweede pagina, gesorteerd op 
 
 Live kaart van België met alle vliegtuigen die er op dat moment overvliegen. Gepositioneerd onderaan de tweede pagina (onder BEL20-aandelen), gecentreerd op max-width 900px.
 
-**Technologie:** Leaflet 1.9.4 (via `cdn.jsdelivr.net`) met CartoDB Dark Matter tiles. Vliegtuigen worden weergegeven als SVG-pijltjes (`divIcon`) in `--teal` kleur die roteren op basis van het `track`-veld (koers in graden). Hover-tooltip toont callsign · vliegtuigtype · hoogte in ft · snelheid in kts.
+**Technologie:** Leaflet 1.9.4 (via `cdn.jsdelivr.net`) met CartoDB Dark Matter tiles. Kaart is begrensd (`maxBounds` lat 44–56, lon -6–16, `minZoom: 6`, `maxBoundsViscosity: 0.8`) zodat de gebruiker niet buiten het relevante gebied kan navigeren.
 
 **Databron:** ADSB.lol community ADS-B aggregator — gratis, geen API key.
 ```
-https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/150
+https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/250
 ```
-150 nautische mijl radius rond Brussel — dekt heel België plus directe buurlanden.
+250 nautische mijl radius rond Brussel — dekt België, buurlanden en een groot deel van West-Europa.
 
 **CORS-aanpak:** De API stuurt geen `access-control-allow-origin` header vanuit de browser. `fetchFlights()` probeert eerst direct, valt bij fout terug op corsproxy.io. Beide paden leveren hetzelfde JSON-formaat.
 
 **Lazy initialisatie:** De Leaflet-kaart wordt pas aangemaakt op het eerste scroll-event (`applyOffset()`), niet bij `init()`. Dit voorkomt dat Leaflet initialiseert met een container die nog buiten het `overflow:hidden` viewport valt (en dan een grootte van 0×0 zou rapporteren). Na initialisatie volgt onmiddellijk een `requestAnimationFrame` met `invalidateSize()` zodat tiles correct laden.
 
 **Verversing:** eigen interval van 12 seconden. Vliegtuigen die verdwijnen uit de API-response worden direct van de kaart verwijderd.
+
+**Vluchtclassificatie:** Elk vliegtuig wordt gecategoriseerd via `classifyAircraft()` op basis van meerdere signalen:
+
+| Categorie | Kleur | Icoon | Detectie |
+|-----------|-------|-------|----------|
+| Lijnvlucht | `#5a9ea2` (teal) | Pijltje 14px | ICAO callsign (3 letters + cijfers) + ADSB-categorie A3–A5 |
+| Cargo | `#c4a35a` (ochre) | Pijltje 14px | Bekende vracht-callsign-prefixen (`CARGO_CALLSIGN_PREFIXES`: FDX, UPS, CLX, TAY, etc.) |
+| Militair | `#c0695e` (coral) | Pijltje 16px | `dbFlags & 1`, militaire callsign-prefixen (`MILITARY_CALLSIGN_PREFIXES`: BAF, RRR, GAF, etc.), militaire vliegtuigtypes (`MILITARY_TYPES`: F16, C130, A400, etc.) |
+| Helikopter | `#8a7ea2` (paars) | Cirkel 12px | ADSB-categorie A7/B1/B2, bekende helikoptertypes (`HELI_TYPES`: EC35, H145, NH90, AW139, etc.) |
+| Overig | `#6e7a85` (grijs) | Pijltje 14px | Privévliegtuigen, kleine luchtvaart, onbekend |
+
+**Prioriteit classificatie:** militair → helikopter → cargo → lijnvlucht → overig (eerste match wint).
+
+**Legende:** Onder de kaart, toont de 5 categorieën met kleurvierkantje en live aantallen per categorie.
+
+**Landvlag in tooltip:** De hover-tooltip toont een vlagjes-emoji op basis van het registratieland van het vliegtuig. `regToFlag()` matcht het `r`-veld (registratie, bv. `OO-SNA` → 🇧🇪) tegen `REG_PREFIX_MAP` (~80 landen) en converteert de ISO-landcode naar Unicode regional indicator symbols. Formaat tooltip: `Categorie · 🇧🇪 · Callsign · (Type) · Hoogte ft · Snelheid kts`.
 
 **Relevante velden per vliegtuig (ADSB.lol JSON):**
 
@@ -214,6 +230,9 @@ https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/150
 | `flight` | Callsign (bijv. `BAW123`) |
 | `t` | ICAO vliegtuigtype (bijv. `A320`) |
 | `hex` | ICAO hex-adres — gebruikt als marker-ID |
+| `r` | Registratie (bijv. `OO-SNA`) — gebruikt voor landvlag |
+| `dbFlags` | Database flags — bit 0 = militair |
+| `category` | ADSB-emittercategorie (A1–A5, B1–B7, etc.) |
 
 ### Livestream bar
 
