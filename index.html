@@ -1538,6 +1538,9 @@ mark {
 
 <script>
 // ─── CONFIG ─────────────────────────────────────────────────────────
+// CORS proxy — verander dit naar je eigen Cloudflare Worker URL
+const CORS_PROXY = 'https://loep-proxy.brecht-neven.workers.dev/?url=';
+
 const CONFIG = {
   refreshInterval: 5 * 60 * 1000,
   breakingThreshold: 30 * 60 * 1000,
@@ -1687,7 +1690,7 @@ async function fetchFeed(sourceKey) {
   if (!source.url) return [];
   try {
     const bustUrl = source.url + (source.url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
-    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(bustUrl), { cache: 'no-store' });
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(bustUrl), { cache: 'no-store' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const xmlText = await resp.text();
     const items = parseXMLFeed(xmlText);
@@ -1961,36 +1964,18 @@ function renderVerkeer(incidents) {
 async function fetchGoogleTrends() {
   const rssUrl = 'https://trends.google.com/trending/rss?geo=BE-VLG';
 
-  // Strategy 1: allorigins (full data with traffic numbers)
+  // Via eigen CORS proxy (full data with traffic numbers)
   try {
-    const resp = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(rssUrl));
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(rssUrl), { cache: 'no-store' });
     if (resp.ok) {
-      const data = await resp.json();
-      if (data.contents && data.contents.startsWith('<?xml')) {
-        const trends = parseGoogleTrendsXml(data.contents);
+      const xmlText = await resp.text();
+      if (xmlText.startsWith('<?xml')) {
+        const trends = parseGoogleTrendsXml(xmlText);
         if (trends.length > 0) return trends;
       }
     }
   } catch (e) {
-    console.warn('Google Trends via allorigins mislukt:', e.message);
-  }
-
-  // Strategy 2: rss2json fallback (titles only, no traffic)
-  try {
-    const resp = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(rssUrl));
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.status === 'ok' && data.items) {
-        return data.items.map((item, i) => ({
-          title: (item.title || '').trim(),
-          traffic: Math.max(1, data.items.length - i),
-          trafficRaw: '',
-          newsTitle: '', newsSource: '', newsUrl: ''
-        }));
-      }
-    }
-  } catch (e) {
-    console.warn('Google Trends via rss2json mislukt:', e.message);
+    console.warn('Google Trends mislukt:', e.message);
   }
 
   return [];
@@ -2047,7 +2032,7 @@ function renderGoogleTrends(trends) {
 async function fetchBel20() {
   const bustUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EBFX?interval=5m&range=1d&_cb=' + Date.now();
   try {
-    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(bustUrl), { cache: 'no-store' });
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(bustUrl), { cache: 'no-store' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     const result = data.chart.result[0];
@@ -2153,7 +2138,7 @@ async function fetchBel20Stocks() {
   const symbols = BEL20_STOCKS.map(s => s.symbol).join(',');
   const url = 'https://query1.finance.yahoo.com/v8/finance/spark?symbols=' + encodeURIComponent(symbols) + '&range=1d&interval=5m&_cb=' + Date.now();
   try {
-    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(url), { cache: 'no-store' });
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(url), { cache: 'no-store' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
 
@@ -2245,7 +2230,7 @@ function attachHls(video, url) {
       xhrSetup: function(xhr, reqUrl) {
         // Proxy only AES key requests blocked by CORS
         if (reqUrl.includes('/keys/')) {
-          xhr.open('GET', 'https://corsproxy.io/?' + encodeURIComponent(reqUrl), true);
+          xhr.open('GET', CORS_PROXY + encodeURIComponent(reqUrl), true);
         }
       }
     });
@@ -2637,9 +2622,9 @@ async function fetchFlights() {
   } catch (e) {
     // Direct geblokkeerd door CORS — val terug op proxy
   }
-  // Fallback via corsproxy.io
+  // Fallback via CORS proxy
   try {
-    const resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(ADSB_URL), { cache: 'no-store' });
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(ADSB_URL), { cache: 'no-store' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     renderFlights(data.ac || []);
