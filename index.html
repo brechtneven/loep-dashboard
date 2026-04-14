@@ -1227,6 +1227,67 @@ mark {
   font-variant-numeric: tabular-nums;
   color: var(--text-sub);
 }
+.aq-marker {
+  border-radius: 50%;
+  opacity: 0.55;
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: opacity 0.2s;
+}
+.aq-marker:hover { opacity: 0.85; }
+
+.aq-legend {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+.aq-legend-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+}
+.aq-legend-title {
+  font-weight: 600;
+  color: var(--text-sub);
+}
+.aq-legend-meta {
+  color: var(--text-dim);
+}
+.aq-legend-meta a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.aq-legend-meta a:hover { text-decoration: underline; }
+.aq-legend-toggle {
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 14px;
+  color: #00FF00;
+  opacity: 0.35;
+  transition: opacity 0.2s;
+  line-height: 1;
+}
+.aq-legend-toggle.active { opacity: 1; }
+.aq-legend-scale {
+  margin-top: 6px;
+}
+.aq-scale-bar {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+}
+.aq-scale-bar span {
+  flex: 1;
+}
+.aq-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
 
 /* Leaflet donker thema */
 .aircraft-icon { background: transparent !important; border: none !important; }
@@ -1564,6 +1625,30 @@ mark {
       <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#c0695e"></span>Militair <span class="flight-legend-count" id="flCntMilitary">0</span></span>
       <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#8a7ea2"></span>Helikopter <span class="flight-legend-count" id="flCntHeli">0</span></span>
       <span class="flight-legend-item"><span class="flight-legend-swatch" style="background:#6e7a85"></span>Overig <span class="flight-legend-count" id="flCntOther">0</span></span>
+    </div>
+    <div class="aq-legend" id="aqLegend">
+      <div class="aq-legend-header">
+        <span class="aq-legend-title">Luchtkwaliteit PM2.5</span>
+        <span class="aq-legend-meta"><span id="aqStationCount">—</span> stations · <a href="https://www.irceline.be" target="_blank" rel="noopener">IRCEL</a></span>
+        <span class="aq-legend-toggle active" id="aqToggle" onclick="toggleAirQuality()" title="Laag aan/uit">&#9679;</span>
+      </div>
+      <div class="aq-legend-scale">
+        <div class="aq-scale-bar">
+          <span style="background:#0099FF"></span>
+          <span style="background:#009900"></span>
+          <span style="background:#00FF00"></span>
+          <span style="background:#FFFF00"></span>
+          <span style="background:#FFBB00"></span>
+          <span style="background:#FF6600"></span>
+          <span style="background:#FF0000"></span>
+          <span style="background:#990099"></span>
+        </div>
+        <div class="aq-scale-labels">
+          <span>Goed</span>
+          <span>Matig</span>
+          <span>Slecht</span>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -2719,6 +2804,8 @@ function initFlightMap() {
   }).addTo(flightMap);
   fetchFlights();
   setInterval(fetchFlights, 12000);
+  fetchAirQuality();
+  setInterval(fetchAirQuality, 5 * 60 * 1000);
 }
 
 const ADSB_URL = 'https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/250';
@@ -2809,6 +2896,118 @@ function renderFlights(aircraft) {
   Object.keys(ids).forEach(k => {
     const cel = document.getElementById(ids[k]);
     if (cel) cel.textContent = counts[k];
+  });
+}
+
+// ─── LUCHTKWALITEIT (IRCEL PM2.5) ───────────────────────────────────
+const IRCEL_URL = 'https://geo.irceline.be/sos/api/v1/timeseries?phenomenon=6001&expanded=true';
+let aqMarkers = {};
+let aqVisible = true;
+let aqData = [];
+
+function aqColor(value) {
+  if (value <= 3.5)  return '#0000FF';
+  if (value <= 7.5)  return '#0099FF';
+  if (value <= 10)   return '#009900';
+  if (value <= 15)   return '#00FF00';
+  if (value <= 20)   return '#FFFF00';
+  if (value <= 35)   return '#FFBB00';
+  if (value <= 50)   return '#FF6600';
+  if (value <= 60)   return '#FF0000';
+  if (value <= 75)   return '#CC0000';
+  return '#990099';
+}
+
+function aqLabel(value) {
+  if (value <= 10) return 'Uitstekend';
+  if (value <= 20) return 'Goed';
+  if (value <= 35) return 'Matig';
+  if (value <= 50) return 'Onvoldoende';
+  if (value <= 75) return 'Slecht';
+  return 'Zeer slecht';
+}
+
+async function fetchAirQuality() {
+  try {
+    const resp = await fetch(IRCEL_URL, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    aqData = await resp.json();
+    renderAirQuality();
+  } catch (e) {
+    console.warn('Luchtkwaliteit ophalen mislukt:', e.message);
+  }
+}
+
+function renderAirQuality() {
+  if (!flightMap || !aqData.length) return;
+  const seen = new Set();
+  let count = 0;
+
+  aqData.forEach(ts => {
+    const geo = ts.station && ts.station.geometry;
+    const val = ts.lastValue && ts.lastValue.value;
+    if (!geo || val === undefined || val === null) return;
+
+    const lon = geo.coordinates[0];
+    const lat = geo.coordinates[1];
+    const id = 'aq_' + ts.id;
+    seen.add(id);
+    count++;
+
+    const color = aqColor(val);
+    const stationLabel = (ts.station.properties.label || '').split(' - ').pop().trim();
+    const tooltip = stationLabel + ' · PM2.5 ' + val.toFixed(1) + ' µg/m³ · ' + aqLabel(val);
+    const size = val > 35 ? 14 : val > 20 ? 12 : 10;
+
+    if (aqMarkers[id]) {
+      if (aqMarkers[id].getTooltip()) aqMarkers[id].getTooltip().setContent(tooltip);
+      aqMarkers[id].setIcon(L.divIcon({
+        className: 'aq-marker',
+        html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + '"></div>',
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2]
+      }));
+    } else {
+      const marker = L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: 'aq-marker',
+          html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + '"></div>',
+          iconSize: [size, size],
+          iconAnchor: [size/2, size/2]
+        }),
+        zIndexOffset: -1000
+      });
+      marker.bindTooltip(tooltip, {
+        permanent: false,
+        className: 'flight-tooltip',
+        direction: 'top',
+        offset: [0, -6]
+      });
+      if (aqVisible) marker.addTo(flightMap);
+      aqMarkers[id] = marker;
+    }
+  });
+
+  // Verwijder stations die niet meer in response zitten
+  Object.keys(aqMarkers).forEach(id => {
+    if (!seen.has(id)) {
+      aqMarkers[id].remove();
+      delete aqMarkers[id];
+    }
+  });
+
+  const el = document.getElementById('aqStationCount');
+  if (el) el.textContent = count;
+}
+
+function toggleAirQuality() {
+  aqVisible = !aqVisible;
+  const toggle = document.getElementById('aqToggle');
+  if (toggle) toggle.classList.toggle('active', aqVisible);
+
+  Object.values(aqMarkers).forEach(m => {
+    if (aqVisible) m.addTo(flightMap);
+    else m.remove();
   });
 }
 
