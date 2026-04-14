@@ -597,6 +597,81 @@ body {
 
 .verkeer-footer a:hover { color: var(--teal); }
 
+/* Spoor sidebar */
+.spoor-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.spoor-stat {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.spoor-stat .num {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.spoor-stat.alert .num { color: var(--coral); }
+.spoor-stat.ok .num { color: var(--sage); }
+
+.spoor-bar {
+  height: 3px;
+  background: var(--rule-light);
+  width: 100%;
+  margin: 4px 0 2px;
+}
+
+.spoor-bar-fill {
+  height: 100%;
+  background: var(--navy);
+  transition: width 0.4s ease;
+}
+
+.spoor-alerts {
+  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.spoor-alert-item {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-sub);
+  line-height: 1.3;
+  padding-left: 7px;
+  border-left: 2px solid var(--ochre);
+}
+
+.spoor-alert-item.suspension {
+  border-left-color: var(--coral);
+  color: var(--coral);
+}
+
+.spoor-footer {
+  margin-top: 4px;
+  font-size: 9px;
+}
+
+.spoor-footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+
+.spoor-footer a:hover { color: var(--teal); }
+
 /* ─── EMPTY / LOADING ───────────────────────────────────────────── */
 .empty-state, .loading-state {
   text-align: center;
@@ -1433,6 +1508,15 @@ mark {
       </div>
     </div>
     <div class="sidebar-section">
+      <h3>Spoornet België</h3>
+      <div id="spoorWidget">
+        <div class="verkeer-empty">Laden...</div>
+      </div>
+      <div class="spoor-footer">
+        <a href="https://www.belgiantrain.be/nl/travel-info/prepare-your-journey/delays" target="_blank" rel="noopener">NMBS actueel &rarr;</a>
+      </div>
+    </div>
+    <div class="sidebar-section">
       <h3>Trending onderwerpen</h3>
       <ul class="trending-list" id="trendingList"></ul>
     </div>
@@ -1485,7 +1569,7 @@ mark {
   
   <div class="nmbs-section" id="nmbsSection">
     <div class="nmbs-header">
-      <h3>Spoornet Status</h3>
+      <h3>NMBS-Spoornet Status</h3>
       <span class="nmbs-meta">
         <span class="nmbs-status"><span class="nmbs-dot"></span><span id="nmbsLastUpdate">—</span></span>
         · <a href="https://docs.irail.be" target="_blank" rel="noopener">iRail</a>
@@ -2454,6 +2538,34 @@ function renderNMBSWidget(vehicles, disturbanceData) {
   }
 
   document.getElementById('nmbsLastUpdate').textContent = new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+
+  // ── Sidebar spoor-widget bijwerken ──
+  const spoorWidget = document.getElementById('spoorWidget');
+  if (spoorWidget) {
+    const delayPct = totalTrains > 0 ? Math.min(100, (delayedTrains / totalTrains) * 100) : 0;
+    const statClass = delayedTrains === 0 ? 'ok' : delayedTrains > 10 ? 'alert' : '';
+    let sh = '<div class="spoor-summary">';
+    sh += '<span class="spoor-stat"><span class="num">' + totalTrains + '</span> ritten</span>';
+    sh += '<span class="spoor-stat ' + statClass + '"><span class="num">' + delayedTrains + '</span> vertraagd</span>';
+    if (canceledTrains > 0) sh += '<span class="spoor-stat alert"><span class="num">' + canceledTrains + '</span> afgeschaft</span>';
+    sh += '</div>';
+    sh += '<div class="spoor-bar"><div class="spoor-bar-fill" style="width:' + delayPct.toFixed(1) + '%"></div></div>';
+
+    // Toon max 2 actieve storingen
+    if (disturbanceData && disturbanceData.disturbance) {
+      const activeAlerts = disturbanceData.disturbance.filter(d => d.type === 'disturbance').slice(0, 2);
+      if (activeAlerts.length > 0) {
+        sh += '<div class="spoor-alerts">';
+        activeAlerts.forEach(d => {
+          const isUnderbroken = /onderbroken|geen treinen|stilgelegd/i.test((d.title || '') + (d.description || ''));
+          sh += '<div class="spoor-alert-item' + (isUnderbroken ? ' suspension' : '') + '">' + escapeHtml(d.title || '') + '</div>';
+        });
+        sh += '</div>';
+      }
+    }
+
+    spoorWidget.innerHTML = sh;
+  }
 }
 
 // ─── VLUCHTKAART (ADSB.LOL) ─────────────────────────────────────────
