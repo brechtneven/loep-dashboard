@@ -2809,7 +2809,7 @@ function renderNMBSWidget(vehicles, disturbanceData) {
 // ─── ELIA ENERGIEMIX ────────────────────────────────────────────────
 const ELIA_FUEL_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods201/records?limit=12&order_by=-datetime';
 const ELIA_LOAD_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods002/records?limit=1&order_by=-datetime&where=measured%20is%20not%20null';
-const ELIA_FLOW_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods160/records?limit=5&order_by=-datetime';
+const ELIA_FLOW_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods160/records?limit=10&order_by=-datetime';
 
 const ELIA_FUEL_CONFIG = {
   'Nuclear':          { label: 'Nucleair',  color: '#e06060' },
@@ -2908,12 +2908,18 @@ function renderEliaData(fuelData, loadData, flowData) {
     }
   }
 
-  // Import/export flows
+  // Import/export flows — dedup op controlarea (pak recentste per land)
   if (flowData && flowData.results) {
     const section = document.getElementById('eliaImportSection');
     if (section) {
+      const flowByCountry = {};
+      flowData.results.forEach(r => {
+        const country = r.controlarea || '';
+        if (!flowByCountry[country]) flowByCountry[country] = r;
+      });
+      const flowEntries = Object.values(flowByCountry);
       let netTotal = 0;
-      const rows = flowData.results.map(r => {
+      const rows = flowEntries.map(r => {
         const country = r.controlarea || '';
         const mw = Math.round(r.physicalflowatborder || 0);
         netTotal += mw;
