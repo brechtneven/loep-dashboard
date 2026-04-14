@@ -82,6 +82,34 @@ Eigen CORS proxy → JSON (intraday 5m intervallen)
         ▼
 fetchBel20() → stats strip (waarde + %) + drawBel20Sparkline() → sidebar canvas
 
+IRCEL-CELINE API (luchtkwaliteit PM2.5)
+        │
+        ▼
+Direct fetch (geen proxy nodig — CORS open)
+        │
+        ▼
+fetchAirQuality() → 83 meetstations met coördinaten + actuele PM2.5-waarde
+        │
+        ▼
+renderAirQuality() → Leaflet circleMarkers op de vluchtkaart (halftransparant, zIndexOffset -1000)
+        │
+        ▼
+Laag op vluchtkaart, toggle aan/uit via legende, verversing elke 5 min
+
+Elia Open Data API (energiemix België)
+        │
+        ▼
+Direct fetch (geen proxy nodig — CORS open)
+        │
+        ▼
+fetchEliaData() → 3 parallelle calls: brandstofmix (ods201), totale load (ods002), fysieke stromen (ods160)
+        │
+        ▼
+renderEliaData() → widget links van vluchtkaart (gestapelde balk + detaillijst + import/export)
+        │
+        ▼
+Verversing elke 5 min
+
 HLS livestreams (CONFIG.streams[])
         │
         ▼
@@ -235,6 +263,84 @@ https://api.adsb.lol/v2/lat/50.85/lon/4.35/dist/250
 | `dbFlags` | Database flags — bit 0 = militair |
 | `category` | ADSB-emittercategorie (A1–A5, B1–B7, etc.) |
 
+### Luchtkwaliteit PM2.5 (IRCEL-CELINE) (2026-04-14)
+
+Halftransparante gekleurde bolletjes op de vluchtkaart die de actuele PM2.5-concentratie per meetstation tonen. Laag kan aan/uit gezet worden via een toggle onder de vluchtlegende.
+
+**Databron:** IRCEL-CELINE SOS API — gratis, geen API key, CORS open (geen proxy nodig).
+```
+https://geo.irceline.be/sos/api/v1/timeseries?phenomenon=6001&expanded=true
+```
+Eén call retourneert alle ~83 PM2.5-stations met coördinaten (`station.geometry.coordinates` in `[lon, lat]` GeoJSON-volgorde), actuele waarde (`lastValue.value` in µg/m³) en timestamp (`lastValue.timestamp` in Unix ms). Data wordt per uur geüpdatet door IRCEL.
+
+**Phenomenon ID:** `6001` = Particulate Matter < 2.5 µm. Andere beschikbare fenomenen: `5` (PM10), `8` (NO₂), `7` (O₃), `391` (Black Carbon).
+
+**Kleurschaal:** Officiële IRCEL BEL-index, 10 niveaus:
+
+| PM2.5 µg/m³ | Kleur | Label |
+|--------------|-------|-------|
+| 0–3.5 | `#0000FF` | Uitstekend |
+| 3.5–7.5 | `#0099FF` | Uitstekend |
+| 7.5–10 | `#009900` | Uitstekend |
+| 10–15 | `#00FF00` | Goed |
+| 15–20 | `#FFFF00` | Goed |
+| 20–35 | `#FFBB00` | Matig |
+| 35–50 | `#FF6600` | Onvoldoende |
+| 50–60 | `#FF0000` | Slecht |
+| 60–75 | `#CC0000` | Slecht |
+| 75+ | `#990099` | Zeer slecht |
+
+**Weergave op kaart:** `L.marker` met `L.divIcon` (CSS class `.aq-marker`). Bolletjes zijn halftransparant (`opacity: 0.55`), schalen mee met de waarde (10px normaal, 12px bij matig, 14px bij slecht+). `zIndexOffset: -1000` zodat vliegtuigen er altijd bovenop liggen. Tooltip hergebruikt de `flight-tooltip` CSS class.
+
+**Stationsnaam:** Geëxtraheerd uit `station.properties.label` door te splitsen op ` - ` en het laatste deel te nemen (= plaatsnaam).
+
+**Toggle:** Eigen sectie onder de vluchtlegende (`.aq-legend`) met horizontale kleurschaalbalk, stationsaantal, en aan/uit toggle. `toggleAirQuality()` voegt markers toe aan of verwijdert ze van de kaart.
+
+**Verversing:** Elke 5 minuten (IRCEL data updatet per uur, vaker ophalen is zinloos).
+
+### Elia Energiemix België (2026-04-14)
+
+Widget links van de vluchtkaart op de tweede pagina. Toont realtime Belgische elektriciteitsproductie per brandstoftype, totale belasting, en netto import/export per buurland.
+
+**Databron:** Elia Open Data API — gratis, geen API key, CORS open (geen proxy nodig). Drie parallelle calls per refresh:
+
+| Dataset | Endpoint | Inhoud |
+|---------|----------|--------|
+| `ods201` | `/api/explore/v2.1/catalog/datasets/ods201/records?limit=12&order_by=-datetime` | Productie per brandstoftype (12 rijen per timestamp) |
+| `ods002` | `/api/explore/v2.1/catalog/datasets/ods002/records?limit=1&order_by=-datetime&where=measured is not null` | Totale gemeten belasting (MW) |
+| `ods160` | `/api/explore/v2.1/catalog/datasets/ods160/records?limit=5&order_by=-datetime` | Fysieke stromen per grens (5 buurlanden) |
+
+**Brandstoftypes (ods201 velden):**
+
+| `fueltypepublication` | Widget-label | Kleur |
+|-----------------------|-------------|-------|
+| Nuclear | Nucleair | `#e06060` |
+| Natural Gas | Gas | `#c4a35a` |
+| Wind Offshore | Wind (zee) | `#5a9ea2` |
+| Wind Onshore | Wind (land) | `#7ab5b8` |
+| Solar | Zon | `#e8c840` |
+| Water | Water | `#4a8fb8` |
+| Biofuels | Biomassa | `#6b8f71` |
+| Other | Overig | `#6e7a85` |
+| Other Fossil Fuels | Fossiel | `#8a7060` |
+| Energy Storage | Opslag | `#8a7ea2` |
+
+Brandstoftypes met 0 MW productie worden niet getoond. Volgorde is vast (nucleair → gas → wind → zon → water → biomassa → overig → fossiel → opslag).
+
+**Import/export (ods160):** `physicalflowatborder` in MW per grens. Positief = import naar België, negatief = export. 5 buurlanden: Frankrijk, Nederland, Duitsland, Luxemburg, Verenigd Koninkrijk. Netto-totaal wordt berekend en getoond met kleurcode (coral = import, sage = export).
+
+**Weergave:**
+- **Big-number:** Totale belasting in MW (Source Serif 4, 28px)
+- **Gestapelde balk:** Horizontale balk met kleur per brandstoftype, breedte proportioneel aan productie
+- **Detaillijst:** Per brandstof: kleurswatchje, naam, MW-waarde, percentage
+- **Import/export:** Per buurland met MW-waarde en kleur, plus netto-totaal
+
+**Layout:** Eerste kolom in `page-2-grid` (280px breed). Grid is nu 3 kolommen: Elia (280px) | Vluchtkaart (1fr) | NMBS (320px). Bij schermen smaller dan 1300px valt Elia over de volle breedte (`grid-column: 1 / -1`).
+
+**Verversing:** Elke 5 minuten (Elia data updatet per 15 minuten).
+
+**Data-vertraging:** ~15–30 minuten vertraging op near-real-time datasets.
+
 ### NMBS Spoornet Status (2026-03-31)
 
 Realtime status widget voor het Belgische spoornet, geplaatst op de tweede pagina **rechts naast de vluchtkaart**. Toont actieve ritten, vertragingen en storingen.
@@ -386,15 +492,19 @@ Artikel-ID's worden gegenereerd via een simpele string-hash (`hashString()`) van
 ── TWEEDE PAGINA (scrollen via stream bar of stocks) ───────────────
 ┌───────────────────────────────────────────────────────────────────┐
 │  BEL20 AANDELEN: grid met alle 20 BEL20-componenten              │
-├────────────────────────────────┬──────────────────────────────────┤
-│  VLUCHTKAART                   │  NMBS SPOORNET STATUS            │
-│  (max-width 900px)             │  (320px breed)                   │
-│  Leaflet + CartoDB Dark Matter │  - Ritten op net                 │
-│  ADSB.lol · verversing 12s     │  - Vertragingen                  │
-│                                │  - Totale achterstand            │
-│                                │  - Actuele storingen             │
-│                                │  Verversing: 60s                 │
-└────────────────────────────────┴──────────────────────────────────┘
+├──────────────┬─────────────────────────────┬──────────────────────┤
+│  ELIA        │  VLUCHTKAART                │  NMBS SPOORNET       │
+│  ENERGIEMIX  │  Leaflet + CartoDB Dark     │  STATUS              │
+│  (280px)     │  Matter (1fr)               │  (320px)             │
+│  - Load MW   │  ADSB.lol · verversing 12s  │  - Ritten op net     │
+│  - Brandstof │  + PM2.5 luchtkwaliteit     │  - Vertragingen      │
+│    mix balk  │    (IRCEL, toggle)           │  - Totale achterst.  │
+│  - Detail/   │                             │  - Actuele storingen │
+│    brandstof │  Legende: vliegtuigtypen    │  Verversing: 2 min   │
+│  - Import/   │  + PM2.5 kleurschaal        │                      │
+│    export    │                             │                      │
+│  Elia · 5min │                             │                      │
+└──────────────┴─────────────────────────────┴──────────────────────┘
 ```
 
 ## Designsysteem
@@ -429,7 +539,8 @@ Datajournalistieke editorial stijl, geïnspireerd op The Pudding / FT / NYT.
 
 ### Layout
 - Content max-width: 900px (grafieken), feed max-width: 720px (leescomfort)
-- Grid: `1fr 240px`
+- Grid pagina 1: `1fr 240px`
+- Grid pagina 2: `280px 1fr 320px` (Elia | Kaart | NMBS)
 - Layout hoogte: `calc(100vh - 70px - 140px)` (ruimte voor header + stream bar)
 - Geen card-achtergronden of borders rond secties — witruimte als scheiding
 - Dunne bottom-border alleen op sidebar sectietitels (h3)
