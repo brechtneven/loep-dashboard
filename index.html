@@ -1128,12 +1128,20 @@ mark {
 /* ─── PAGE 2 GRID ─────────────────────────────────────────────────── */
 .page-2-grid {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 280px 1fr 320px;
   gap: 24px;
   padding: 24px 40px 48px;
   background: var(--bg);
   border-top: 1px solid var(--rule);
   align-items: start;
+}
+
+@media (max-width: 1300px) {
+  .page-2-grid {
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+  .elia-section { grid-column: 1 / -1; }
 }
 
 @media (max-width: 1100px) {
@@ -1142,6 +1150,130 @@ mark {
     gap: 32px;
   }
 }
+
+/* ─── ELIA ENERGIEMIX ─────────────────────────────────────────── */
+.elia-section {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+}
+.elia-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule-light);
+}
+.elia-header h3 {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin: 0;
+}
+.elia-meta {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.elia-meta a { color: var(--teal); text-decoration: none; }
+.elia-meta a:hover { text-decoration: underline; }
+.elia-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+.elia-load {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--rule-light);
+  text-align: center;
+}
+.elia-load-value {
+  font-family: var(--font-title);
+  font-size: 28px;
+  color: var(--text);
+  line-height: 1;
+}
+.elia-load-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+.elia-bar-section {
+  padding: 12px;
+}
+.elia-stacked-bar {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.elia-stacked-bar span {
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+.elia-fuel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.elia-fuel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-sub);
+}
+.elia-fuel-swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+.elia-fuel-name { flex: 1; }
+.elia-fuel-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+}
+.elia-fuel-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  font-size: 10px;
+  width: 36px;
+  text-align: right;
+}
+.elia-import-section {
+  padding: 10px 12px;
+  border-top: 1px solid var(--rule-light);
+}
+.elia-import-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 3px 0;
+}
+.elia-import-label { color: var(--text-sub); }
+.elia-import-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.elia-import-pos { color: var(--coral); }
+.elia-import-neg { color: var(--sage); }
 
 /* ─── VLUCHTKAART ───────────────────────────────────────────────── */
 .flightmap-section {
@@ -1610,6 +1742,25 @@ mark {
   </div>
 </div>
 <div class="page-2-grid" id="page2Grid">
+  <div class="elia-section" id="eliaSection">
+    <div class="elia-header">
+      <h3>Energiemix België</h3>
+      <span class="elia-meta">
+        <span class="elia-dot"></span>
+        <a href="https://opendata.elia.be" target="_blank" rel="noopener">Elia</a>
+      </span>
+    </div>
+    <div class="elia-load">
+      <div class="elia-load-value" id="eliaLoadValue">—</div>
+      <div class="elia-load-label">Totale belasting MW</div>
+    </div>
+    <div class="elia-bar-section">
+      <div class="elia-stacked-bar" id="eliaStackedBar"></div>
+      <ul class="elia-fuel-list" id="eliaFuelList"></ul>
+    </div>
+    <div class="elia-import-section" id="eliaImportSection"></div>
+  </div>
+
   <div class="flightmap-section" id="flightMapSection">
     <div class="flightmap-header">
       <h3>Luchtverkeer boven België</h3>
@@ -2502,13 +2653,15 @@ async function init() {
   fetchBel20Stocks();
   fetchVerkeer();
   fetchNMBSData();
+  fetchEliaData();
   renderStreamBar();
 
-  // BEL20 ververst elke 2 minuten, Verkeer elke minuut, NMBS elke 2 minuten
+  // BEL20 ververst elke 2 minuten, Verkeer elke minuut, NMBS elke 2 minuten, Elia elke 5 minuten
   setInterval(() => fetchBel20(), 2 * 60 * 1000);
   setInterval(() => fetchBel20Stocks(), 2 * 60 * 1000);
   setInterval(() => fetchVerkeer(), 60 * 1000);
   setInterval(() => fetchNMBSData(), 2 * 60 * 1000);
+  setInterval(() => fetchEliaData(), 5 * 60 * 1000);
 
   setInterval(async () => {
     const a = await fetchAllFeeds();
@@ -2650,6 +2803,138 @@ function renderNMBSWidget(vehicles, disturbanceData) {
     }
 
     spoorWidget.innerHTML = sh;
+  }
+}
+
+// ─── ELIA ENERGIEMIX ────────────────────────────────────────────────
+const ELIA_FUEL_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods201/records?limit=12&order_by=-datetime';
+const ELIA_LOAD_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods002/records?limit=1&order_by=-datetime&where=measured%20is%20not%20null';
+const ELIA_FLOW_URL = 'https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods160/records?limit=5&order_by=-datetime';
+
+const ELIA_FUEL_CONFIG = {
+  'Nuclear':          { label: 'Nucleair',  color: '#e06060' },
+  'Natural Gas':      { label: 'Gas',       color: '#c4a35a' },
+  'Wind Offshore':    { label: 'Wind (zee)', color: '#5a9ea2' },
+  'Wind Onshore':     { label: 'Wind (land)', color: '#7ab5b8' },
+  'Solar':            { label: 'Zon',       color: '#e8c840' },
+  'Water':            { label: 'Water',     color: '#4a8fb8' },
+  'Biofuels':         { label: 'Biomassa',  color: '#6b8f71' },
+  'Other':            { label: 'Overig',    color: '#6e7a85' },
+  'Other Fossil Fuels': { label: 'Fossiel', color: '#8a7060' },
+  'Energy Storage':   { label: 'Opslag',    color: '#8a7ea2' }
+};
+
+const ELIA_FLOW_LABELS = {
+  'France': 'Frankrijk',
+  'Netherlands': 'Nederland',
+  'Germany': 'Duitsland',
+  'Luxembourg': 'Luxemburg',
+  'United Kingdom': 'Ver. Koninkrijk'
+};
+
+async function fetchEliaData() {
+  try {
+    const [fuelResp, loadResp, flowResp] = await Promise.all([
+      fetch(ELIA_FUEL_URL, { cache: 'no-store' }),
+      fetch(ELIA_LOAD_URL, { cache: 'no-store' }),
+      fetch(ELIA_FLOW_URL, { cache: 'no-store' })
+    ]);
+
+    const fuelData = fuelResp.ok ? await fuelResp.json() : null;
+    const loadData = loadResp.ok ? await loadResp.json() : null;
+    const flowData = flowResp.ok ? await flowResp.json() : null;
+
+    renderEliaData(fuelData, loadData, flowData);
+  } catch (e) {
+    console.warn('Elia data ophalen mislukt:', e.message);
+  }
+}
+
+function renderEliaData(fuelData, loadData, flowData) {
+  // Total load
+  if (loadData && loadData.results && loadData.results.length) {
+    const mw = Math.round(loadData.results[0].measured);
+    const el = document.getElementById('eliaLoadValue');
+    if (el) el.textContent = mw.toLocaleString('nl-BE');
+  }
+
+  // Fuel mix — group by fuel type, sum generatedpower
+  if (fuelData && fuelData.results) {
+    const fuels = {};
+    fuelData.results.forEach(r => {
+      const key = r.fueltypepublication;
+      const mw = r.generatedpower || 0;
+      if (fuels[key]) fuels[key] += mw;
+      else fuels[key] = mw;
+    });
+
+    // Merge Water entries, merge Other entries
+    const merged = [];
+    const windTotal = (fuels['Wind Offshore'] || 0) + (fuels['Wind Onshore'] || 0);
+    const order = ['Nuclear', 'Natural Gas', 'Wind Offshore', 'Wind Onshore', 'Solar', 'Water', 'Biofuels', 'Other', 'Other Fossil Fuels', 'Energy Storage'];
+    let total = 0;
+
+    order.forEach(key => {
+      const mw = fuels[key] || 0;
+      if (mw > 0) {
+        merged.push({ key, mw });
+        total += mw;
+      }
+    });
+
+    // Stacked bar
+    const barEl = document.getElementById('eliaStackedBar');
+    if (barEl && total > 0) {
+      barEl.innerHTML = merged.map(f => {
+        const cfg = ELIA_FUEL_CONFIG[f.key] || { color: '#6e7a85' };
+        const pct = (f.mw / total * 100);
+        return '<span style="width:' + pct.toFixed(1) + '%;background:' + cfg.color + '" title="' + (cfg.label || f.key) + ' ' + Math.round(f.mw) + ' MW"></span>';
+      }).join('');
+    }
+
+    // Fuel list
+    const listEl = document.getElementById('eliaFuelList');
+    if (listEl) {
+      listEl.innerHTML = merged.map(f => {
+        const cfg = ELIA_FUEL_CONFIG[f.key] || { label: f.key, color: '#6e7a85' };
+        const pct = total > 0 ? (f.mw / total * 100).toFixed(1) : '0.0';
+        return '<li class="elia-fuel-row">' +
+          '<span class="elia-fuel-swatch" style="background:' + cfg.color + '"></span>' +
+          '<span class="elia-fuel-name">' + cfg.label + '</span>' +
+          '<span class="elia-fuel-value">' + Math.round(f.mw).toLocaleString('nl-BE') + '</span>' +
+          '<span class="elia-fuel-pct">' + pct + '%</span>' +
+          '</li>';
+      }).join('');
+    }
+  }
+
+  // Import/export flows
+  if (flowData && flowData.results) {
+    const section = document.getElementById('eliaImportSection');
+    if (section) {
+      let netTotal = 0;
+      const rows = flowData.results.map(r => {
+        const country = r.controlarea || '';
+        const mw = Math.round(r.physicalflowatborder || 0);
+        netTotal += mw;
+        const label = ELIA_FLOW_LABELS[country] || country;
+        const cls = mw >= 0 ? 'elia-import-pos' : 'elia-import-neg';
+        const prefix = mw > 0 ? '+' : '';
+        return '<div class="elia-import-row">' +
+          '<span class="elia-import-label">' + label + '</span>' +
+          '<span class="elia-import-value ' + cls + '">' + prefix + mw.toLocaleString('nl-BE') + ' MW</span>' +
+          '</div>';
+      });
+
+      const netCls = netTotal >= 0 ? 'elia-import-pos' : 'elia-import-neg';
+      const netPrefix = netTotal > 0 ? '+' : '';
+      rows.push('<div class="elia-import-row" style="border-top:1px solid var(--rule-light);padding-top:6px;margin-top:4px">' +
+        '<span class="elia-import-label" style="font-weight:600">Netto</span>' +
+        '<span class="elia-import-value ' + netCls + '">' + netPrefix + netTotal.toLocaleString('nl-BE') + ' MW ' + (netTotal >= 0 ? '(import)' : '(export)') + '</span>' +
+        '</div>');
+
+      section.innerHTML = rows.join('');
+    }
   }
 }
 
