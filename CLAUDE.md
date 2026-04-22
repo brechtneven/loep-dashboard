@@ -387,7 +387,7 @@ Vaste balk (140px) onderaan het scherm met live TV-streams, OSINT-dashboardstijl
 | Al Jazeera | `live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8` | Internationaal |
 | Euronews | `dash4.antik.sk/live/test_euronews/playlist.m3u8` | Internationaal |
 | HLN Live | `live-streaming.dpgmedia.net/hln-live-.../index_720.m3u8` | Belgisch-nationaal |
-| LN24 | `live-ln24.digiteka.com/1911668011/index.m3u8` | Belgisch-nationaal |
+| LN24 | `funradiovisionlow.vedge.infomaniak.com/livecast/ik:funradiovisionlow/manifest.m3u8` | Belgisch-nationaal (Infomaniak CDN — bucketnaam is misleidend, maar dit is wél de LN24-videostream zoals gebruikt door hun eigen "Rise" player op `ln24.be/rise-api/videoplayers/live.php`) |
 | BX1 | `59959724487e3.streamlock.net/stream/live/playlist.m3u8` | Belgisch-nationaal |
 | ATV | `live.zendzend.com/cmaf/29375_107244/master.m3u8` | Vlaams-regionaal (Antwerpen) |
 | TVL | `live.zendzend.com/cmaf/29375_395474/master.m3u8` | Vlaams-regionaal (Limburg) |
