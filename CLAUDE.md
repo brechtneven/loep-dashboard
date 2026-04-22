@@ -507,6 +507,39 @@ Artikel-ID's worden gegenereerd via een simpele string-hash (`hashString()`) van
 └──────────────┴─────────────────────────────┴──────────────────────┘
 ```
 
+## Responsive / mobiel (<768px, 2026-04-22)
+
+De site is **desktop-first** gebouwd maar heeft een volledig mobile-responsive pad voor smartphones en smalle tablets. Eén breakpoint: `@media (max-width: 768px)`. Geen aparte `m.loep.info`, geen hamburger-menu, geen JS-framework — pure CSS plus enkele minimale JS-tweaks.
+
+**Scroll-model omgekeerd:** de desktop-variant rendert in een fixed 100vh `#dashboardWrapper` met `overflow: hidden` en gebruikt `wheel`-events om met `translateY(-Npx)` tussen pagina 1 en pagina 2 te snappen (zie `onWheel`/`applyOffset`/`snapToPage` in [index.html](index.html)). Op mobiel werkt dat niet (geen wheel-events op touch-devices) en is het hele mechanisme uitgeschakeld:
+
+- `html, body, #dashboardWrapper, .dashboard-viewport, .page-2` → `height: auto; overflow-x: hidden; overflow-y: auto/visible; max-width: 100vw`
+- De IIFE met `onWheel` returnt early bij `window.matchMedia('(max-width: 768px)').matches` en registreert dus geen wheel-listeners
+- `#dashboardContent { transform: none !important }` ruimt een stuck `translateY` op bij viewport-resize van desktop → mobiel
+
+**Vluchtkaart lazy-init op mobiel:** omdat de desktop-flow `initFlightMap()` triggert vanuit `applyOffset()` (alleen bij offset > 0), is dat op mobiel vervangen door een `IntersectionObserver` met `rootMargin: '200px'` op `#flightMap`. De kaart initialiseert zodra hij in beeld komt en de observer disconnect zichzelf daarna.
+
+**Sidebar-secties los geordend:** op mobiel krijgt `.layout` `display: flex; flex-direction: column` en `.sidebar` krijgt `display: contents` — daardoor worden de `.sidebar-section`-kinderen directe kinderen van `.layout` en kunnen ze individueel worden geordend met CSS `order`. De eerste sectie (`BEL20 Intraday` sparkline) krijgt `order: 5` en verschijnt daardoor vóór de feed (direct onder de BEL20-ticker in de stats-strip). De feed heeft `order: 10`, alle andere sidebar-secties `order: 20`.
+
+**Pagina 2-volgorde omgekeerd:** op mobiel `.page-2-grid` 1-koloms, met `.nmbs-section { order: 1 }`, `.flightmap-section { order: 2 }`, `.elia-section { order: 3 }`. Redenering: realtime spoorstoringen en luchtverkeer zijn journalistiek relevanter dan energiemix — die komt als laatste.
+
+**Stream bar als horizontale carousel:** desktop toont 8 streams naast elkaar (`flex: 1 1 0%`, 140px hoog). Mobiel wordt `height: 80px` + `.stream-channels { overflow-x: auto; scroll-snap-type: x mandatory }` en elk kanaal `flex: 0 0 45vw; scroll-snap-align: start` — twee streams tegelijk in beeld, swipen voor de rest. `.stream-bar { overflow: hidden; max-width: 100vw }` kapselt de intern bredere scroll-container in.
+
+**Header op twee rijen:** `flex-wrap: wrap` plus `order`-klassen — rij 1 toont titel + status + zoekbalk (100% breed, `flex: 1 1 100%`), rij 2 toont de 6 bron-toggles + Privacy/Colofon/GitHub gecentreerd. `position: sticky` wordt `position: static` op mobiel (natural scroll).
+
+**Overige tweaks:**
+- Artikelkoppen: `white-space: nowrap` + ellipsis → `white-space: normal; flex: 1 1 100%; order: 10` zodat de titel op eigen regel wrapt onder badge/tijd/betrouwbaarheid
+- `overflow-wrap: break-word` op alle tekst-content (samenvatting, trending, alerts, fuel-list) om lange woorden/URL's te breken
+- `.stocks-grid` minmax verlaagd van 200px → 140px
+- `#flightMap { height: 360px }` (was 480px)
+- `.progress-bar` en alle `.scroll-hint`/`.scroll-hint-up` pijltjes `display: none` (desktop-only mechaniek)
+- `.toast { bottom: 100px }` (past boven nieuwe 80px streambar)
+- `.stream-modal-content { width: 95vw }` (was 80vw)
+- Defensive `min-width: 0; max-width: 100%` op alle grid-kinderen om intrinsic flex-min-width overflow te voorkomen
+- `.nmbs-stat-row { flex-wrap: wrap }` zodat lange waardes onder hun label kunnen wrappen
+
+**Wat NIET geraakt werd op mobiel:** `render()`-pipeline, `fetchFeed()` / `fetchAllFeeds()`, dedup-logica, `parseXMLFeed`, alle andere fetchers. Minimale JS-diff: alleen de wheel-snap IIFE is conditioneel geworden.
+
 ## Designsysteem
 
 Datajournalistieke editorial stijl, geïnspireerd op The Pudding / FT / NYT.
@@ -544,6 +577,11 @@ Datajournalistieke editorial stijl, geïnspireerd op The Pudding / FT / NYT.
 - Layout hoogte: `calc(100vh - 70px - 140px)` (ruimte voor header + stream bar)
 - Geen card-achtergronden of borders rond secties — witruimte als scheiding
 - Dunne bottom-border alleen op sidebar sectietitels (h3)
+
+**Breakpoints:**
+- `@media (max-width: 1300px)` — pagina 2 krimpt naar 2 kolommen (Elia spant full-width)
+- `@media (max-width: 1100px)` — pagina 2 volledig 1-koloms
+- `@media (max-width: 768px)` — mobile-mode: natural document scroll, sidebar los geordend, stream bar als carousel, header op 2 rijen (zie §Responsive / mobiel hierboven voor de volledige aanpak)
 
 ### Speciale elementen
 - **Big-number callouts:** grote statistieken bovenaan (Source Serif 4, 36px)
