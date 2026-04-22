@@ -1654,14 +1654,164 @@ mark {
 }
 
 /* ─── RESPONSIVE ────────────────────────────────────────────────── */
-@media (max-width: 800px) {
-  .layout { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
-  .header { flex-wrap: wrap; gap: 8px; }
-  .stats-strip { flex-wrap: wrap; gap: 16px; }
-  .stream-bar { height: 100px; }
-  .stream-channel { min-width: 0; }
+@media (max-width: 768px) {
+  /* Scroll-model: natural document scroll i.p.v. fixed viewport + translateY-snap */
+  html, body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: auto;
+    max-width: 100vw;
+  }
+  #dashboardWrapper { height: auto; overflow-x: hidden; overflow-y: visible; max-width: 100vw; }
+  #dashboardContent { transform: none !important; max-width: 100vw; }
+  .dashboard-viewport { height: auto; max-width: 100vw; overflow-x: hidden; }
+  .page-2 { max-width: 100vw; overflow-x: hidden; min-height: 0; }
+  .feed { overflow: visible; padding: 8px 14px; min-width: 0; }
+  .sidebar { overflow: visible; min-width: 0; }
+
+  /* Progress bar + scroll-hints uit (desktop-only mechaniek) */
+  .progress-bar { display: none; }
+  .scroll-hint, .scroll-hint-up { display: none !important; }
+
+  /* Header: twee rijen, statisch i.p.v. sticky (natural scroll nu) */
+  .header {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    position: static;
+  }
+  .header h1 { font-size: 16px; }
+  .status { font-size: 10px; }
+  .search-bar {
+    flex: 1 1 100%;
+    max-width: 100%;
+    order: 2;
+  }
+  .controls {
+    order: 3;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    width: 100%;
+  }
+  .header-about {
+    order: 4;
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  /* Stats-strip stacken */
+  .stats-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .stat-bel20 { margin-left: 0 !important; }
+
+  /* Pagina 1: sidebar-secties los orderen (BEL20 sparkline meteen bovenaan) */
+  .layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar {
+    display: contents; /* sidebar-secties worden directe children van .layout */
+  }
+  .sidebar-section {
+    order: 20;
+    border-top: 1px solid var(--rule);
+  }
+  .sidebar-section:first-child {
+    order: 5; /* BEL20 Intraday vóór de feed */
+    border-top: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  .feed { order: 10; }
+
+  /* Pagina 2: alles in één kolom, volgorde: NMBS → kaart → Elia */
+  .page-2-grid {
+    grid-template-columns: 1fr;
+    padding: 16px 14px 24px;
+    gap: 20px;
+  }
+  .page-2-grid > * { min-width: 0; max-width: 100%; }
+  .nmbs-section { order: 1; min-width: 0; max-width: 100%; }
+  .flightmap-section { order: 2; min-width: 0; max-width: 100%; }
+  .elia-section { order: 3; min-width: 0; max-width: 100%; }
+  .stocks-section { padding: 16px 14px; min-width: 0; max-width: 100%; }
+  .stocks-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    min-width: 0;
+  }
+  .stocks-grid > * { min-width: 0; }
+  .stock-name { flex-shrink: 1; }
+  .stock-price { flex-shrink: 0; margin-right: 6px; }
+
+  /* NMBS rijen mogen wrappen als content te breed wordt */
+  .nmbs-stat-row, .nmbs-header { flex-wrap: wrap; row-gap: 2px; }
+  .nmbs-stat-label, .nmbs-stat-value { min-width: 0; }
+
+  /* Vluchtkaart lager maar nog bruikbaar */
+  #flightMap { height: 360px; }
+
+  /* Stream bar: horizontaal scrollbaar carousel */
+  .stream-bar {
+    height: 80px;
+    overflow: hidden;
+    max-width: 100vw;
+  }
+  .stream-channels {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+  .stream-channels::-webkit-scrollbar { display: none; }
+  .stream-channel {
+    flex: 0 0 45vw;
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  .stream-bar-label {
+    font-size: 8px;
+    padding: 0 6px;
+    letter-spacing: 1px;
+  }
+
+  /* Toast boven de nieuwe stream bar */
+  .toast {
+    bottom: 100px;
+    max-width: calc(100vw - 32px);
+  }
+
+  /* Video modal */
   .stream-modal-content { width: 95vw; }
+
+  /* Artikelkoppen mogen wrappen — ellipsis is slechte UX op mobiel */
+  .article-row { flex-wrap: wrap; }
+  .article-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    flex: 1 1 100%;
+    order: 10;
+  }
+
+  /* Lange woorden/URL's in tekst-content breken */
+  .article-summary,
+  .gtrends-title,
+  .trending-item,
+  .reliability-name,
+  .nmbs-alert-title,
+  .nmbs-alert-desc,
+  .verkeer-incident,
+  .elia-fuel-name {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
 }
 </style>
 </head>
@@ -3349,6 +3499,24 @@ function toggleAirQuality() {
   const page2 = document.querySelector('.page-2');
   const scrollHint = document.getElementById('scrollHint');
   const scrollHintUp = document.getElementById('scrollHintUp');
+  const flightMapEl = document.getElementById('flightMap');
+
+  // Op mobiel: natural document scroll, geen translateY-snap.
+  // Kaart wordt lazy geïnitieerd via IntersectionObserver zodra hij in beeld komt.
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    if (flightMapEl && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting) && !flightMap) {
+          initFlightMap();
+          requestAnimationFrame(() => { if (flightMap) flightMap.invalidateSize(); });
+          io.disconnect();
+        }
+      }, { rootMargin: '200px' });
+      io.observe(flightMapEl);
+    }
+    return;
+  }
+
   let offset = 0;
   let snapTimer;
   let lastDirection = 0; // -1 = omhoog, 1 = omlaag
