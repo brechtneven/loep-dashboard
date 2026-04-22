@@ -368,12 +368,6 @@ body {
   flex-shrink: 0;
 }
 
-.article-reliability {
-  font-size: 10px;
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-
 .dedup-count {
   font-size: 9px;
   color: var(--teal);
@@ -533,42 +527,6 @@ body {
   width: 100%;
   margin-top: 6px;
   text-align: center;
-}
-
-/* Reliability */
-.reliability-list { list-style: none; }
-
-.reliability-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 2px 0;
-  font-size: 10px;
-  color: var(--text-sub);
-}
-
-.reliability-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.reliability-bar {
-  width: 40px;
-  height: 3px;
-  background: var(--rule-light);
-  overflow: hidden;
-}
-
-.reliability-fill { height: 100%; }
-.reliability-fill.high { background: var(--sage); }
-.reliability-fill.medium { background: var(--ochre); }
-.reliability-fill.low { background: var(--coral); }
-
-.reliability-pct {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--text-dim);
 }
 
 /* Verkeer */
@@ -1804,7 +1762,6 @@ mark {
   .article-summary,
   .gtrends-title,
   .trending-item,
-  .reliability-name,
   .nmbs-alert-title,
   .nmbs-alert-desc,
   .verkeer-incident,
@@ -1902,10 +1859,6 @@ mark {
     <div class="sidebar-section">
       <h3>Trending onderwerpen</h3>
       <ul class="trending-list" id="trendingList"></ul>
-    </div>
-    <div class="sidebar-section">
-      <h3>Bronbetrouwbaarheid</h3>
-      <ul class="reliability-list" id="reliabilityList"></ul>
     </div>
   </aside>
 </div>
@@ -2059,39 +2012,27 @@ const CONFIG = {
   sources: {
     vrt: {
       name: 'VRT NWS',
-      url: 'https://www.vrt.be/vrtnws/nl.rss.articles.xml',
-      reliability: 92,
-      label: 'Openbare omroep, sterke factchecking'
+      url: 'https://www.vrt.be/vrtnws/nl.rss.articles.xml'
     },
     hln: {
       name: 'HLN',
-      url: 'https://www.hln.be/rss.xml',
-      reliability: 65,
-      label: 'Populair, soms sensationeel'
+      url: 'https://www.hln.be/rss.xml'
     },
     demorgen: {
       name: 'De Morgen',
-      url: 'https://www.demorgen.be/rss.xml',
-      reliability: 82,
-      label: 'Kwaliteitskrant, progressief-analytisch'
+      url: 'https://www.demorgen.be/rss.xml'
     },
     standaard: {
       name: 'De Standaard',
-      url: 'https://news.google.com/rss/search?q=site:standaard.be&hl=nl&gl=BE&ceid=BE:nl',
-      reliability: 88,
-      label: 'Kwaliteitskrant, via Google News (tijdelijk)'
+      url: 'https://news.google.com/rss/search?q=site:standaard.be&hl=nl&gl=BE&ceid=BE:nl'
     },
     nieuwsblad: {
       name: 'Het Nieuwsblad',
-      url: 'https://news.google.com/rss/search?q=site:nieuwsblad.be&hl=nl&gl=BE&ceid=BE:nl',
-      reliability: 72,
-      label: 'Breed regionaal, via Google News (tijdelijk)'
+      url: 'https://news.google.com/rss/search?q=site:nieuwsblad.be&hl=nl&gl=BE&ceid=BE:nl'
     },
     tijd: {
       name: 'De Tijd',
-      url: 'https://www.tijd.be/rss/nieuws.xml',
-      reliability: 90,
-      label: 'Financieel-economische kwaliteitskrant'
+      url: 'https://www.tijd.be/rss/nieuws.xml'
     }
   },
   streams: [
@@ -2327,7 +2268,6 @@ function render() {
       h.push('<span class="dedup-count" onclick="this.closest(\'.article\').querySelector(\'.dedup-sources\')?.classList.toggle(\'open\')" title="Ook bij: ' + escapeHtml(others) + '">+' + (group.length - 1) + '</span>');
     }
     h.push('<span class="article-time">' + dateStr + ' ' + timeStr + ' \u00b7 ' + formatTimeAgo(p.date) + '</span>');
-    h.push('<span class="article-reliability" title="' + escapeHtml(CONFIG.sources[p.source].label) + '">' + CONFIG.sources[p.source].reliability + '%</span>');
     h.push('</div>');
 
     if (p.summary) {
@@ -2348,7 +2288,6 @@ function render() {
   document.getElementById('feed').innerHTML = h.join('');
 
   renderTrending();
-  renderReliability();
 }
 
 function renderTrending() {
@@ -2358,13 +2297,6 @@ function renderTrending() {
   ).join('');
 }
 
-
-function renderReliability() {
-  document.getElementById('reliabilityList').innerHTML = Object.entries(CONFIG.sources).map(([k, s]) => {
-    const lv = s.reliability >= 85 ? 'high' : s.reliability >= 70 ? 'medium' : 'low';
-    return '<li class="reliability-item"><span>' + s.name + '</span><div class="reliability-bar-wrap"><div class="reliability-bar"><div class="reliability-fill ' + lv + '" style="width:' + s.reliability + '%"></div></div><span class="reliability-pct">' + s.reliability + '%</span></div></li>';
-  }).join('');
-}
 
 // ─── VERKEER VLAANDEREN (DATEX II) ──────────────────────────────────
 async function fetchVerkeer() {
