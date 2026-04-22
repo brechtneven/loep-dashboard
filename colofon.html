@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colofon — Loep</title>
+<meta name="description" content="Colofon van loep.info — wie, wat en welke bronnen.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#111114">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #111114;
+  --surface: #18181c;
+  --text: #e0ddd8;
+  --text-sub: #a09a90;
+  --text-dim: #6b665e;
+  --rule: #2a2a2e;
+  --rule-light: #1f1f23;
+  --teal: #5a9ea2;
+  --font-body: 'Georgia', serif;
+  --font-title: 'Source Serif 4', Georgia, serif;
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+.back-link {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 32px;
+}
+.back-link:hover { color: var(--teal); }
+h1 {
+  font-family: var(--font-title);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.meta {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 32px;
+}
+h2 {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 36px;
+  margin-bottom: 10px;
+}
+p { margin-bottom: 14px; color: var(--text-sub); }
+p strong { color: var(--text); font-weight: 600; }
+a { color: var(--teal); text-decoration: none; border-bottom: 1px solid var(--rule); }
+a:hover { border-bottom-color: var(--teal); }
+ul { margin: 0 0 14px 0; list-style: none; }
+.source-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule-light);
+  color: var(--text-sub);
+  font-size: 14px;
+}
+.source-list li:last-child { border-bottom: none; }
+.source-list strong { color: var(--text); font-weight: 600; display: inline-block; min-width: 140px; }
+.lead {
+  font-family: var(--font-title);
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+.footer {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule-light);
+}
+.footer a { color: var(--text-sub); border-bottom: none; }
+.footer a:hover { color: var(--teal); }
+</style>
+</head>
+<body>
+<main class="page">
+
+<a href="/" class="back-link">&larr; Terug naar Loep</a>
+
+<h1>Colofon</h1>
+<p class="meta">Over deze site</p>
+
+<p class="lead">Loep is een persoonlijk OSINT-dashboard dat realtime nieuws en publieke data samenbrengt op één scherm &mdash; bedacht voor onderzoeksjournalisten, nieuwsgierige burgers en iedereen die graag het overzicht bewaart.</p>
+
+<h2>Wie</h2>
+
+<p><strong>Brecht Neven</strong> &mdash; journalist &amp; tinkerer. Contact: <a href="mailto:brecht.neven@gmail.com">brecht.neven@gmail.com</a></p>
+
+<h2>Wat</h2>
+
+<p>Eén HTML-bestand, geen backend, geen trackers, geen cookies. Alle data wordt rechtstreeks uit publieke bronnen gehaald en in je browser samengevoegd. De broncode staat open op <a href="https://github.com/brechtneven/loep-dashboard" target="_blank" rel="noopener">GitHub</a>.</p>
+
+<h2>Bronnen</h2>
+
+<p>Loep toont data uit de volgende openbare bronnen. Alle credits en eventuele gebruiksvoorwaarden horen bij de oorspronkelijke aanbieders.</p>
+
+<ul class="source-list">
+  <li><strong>Nieuws</strong> <a href="https://www.vrt.be/vrtnws/nl/" target="_blank" rel="noopener">VRT NWS</a>, <a href="https://www.hln.be" target="_blank" rel="noopener">HLN</a>, <a href="https://www.demorgen.be" target="_blank" rel="noopener">De Morgen</a>, <a href="https://www.tijd.be" target="_blank" rel="noopener">De Tijd</a>, <a href="https://www.standaard.be" target="_blank" rel="noopener">De Standaard</a>, <a href="https://www.nieuwsblad.be" target="_blank" rel="noopener">Het Nieuwsblad</a></li>
+  <li><strong>Trending</strong> <a href="https://trends.google.com/trending?geo=BE-VLG" target="_blank" rel="noopener">Google Trends Vlaanderen</a></li>
+  <li><strong>Verkeer</strong> <a href="https://www.verkeerscentrum.be/" target="_blank" rel="noopener">Verkeerscentrum Vlaanderen</a> (DATEX II)</li>
+  <li><strong>Beurs</strong> <a href="https://finance.yahoo.com" target="_blank" rel="noopener">Yahoo Finance</a> (BEL20)</li>
+  <li><strong>Luchtverkeer</strong> <a href="https://adsb.lol" target="_blank" rel="noopener">ADSB.lol</a> (community ADS-B-aggregator)</li>
+  <li><strong>Luchtkwaliteit</strong> <a href="https://www.irceline.be" target="_blank" rel="noopener">IRCEL-CELINE</a> (PM2.5-meetstations)</li>
+  <li><strong>Energiemix</strong> <a href="https://opendata.elia.be" target="_blank" rel="noopener">Elia Open Data</a></li>
+  <li><strong>Spoornet</strong> <a href="https://hello.irail.be" target="_blank" rel="noopener">iRail</a> (NMBS liveboards &amp; storingen)</li>
+  <li><strong>Livestreams</strong> CBS News, Al Jazeera, Euronews, HLN, LN24, BX1, ATV, TVL &mdash; publieke HLS-streams</li>
+  <li><strong>Kaart</strong> <a href="https://carto.com/attributions" target="_blank" rel="noopener">CartoDB</a> Dark Matter basemap, <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-bijdragers</li>
+</ul>
+
+<h2>Technisch</h2>
+
+<p>Vanilla HTML/CSS/JavaScript, één bestand, geen build-stap. Externe bibliotheken: <a href="https://github.com/video-dev/hls.js" target="_blank" rel="noopener">hls.js</a> voor livestreams en <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a> voor de kaart. CORS-proxy via een eigen <a href="https://workers.cloudflare.com" target="_blank" rel="noopener">Cloudflare Worker</a>. Gehost via GitHub Pages.</p>
+
+<h2>Disclaimer</h2>
+
+<p>Loep is geen officiële nieuwsdienst. Data kan vertraagd, onvolledig of foutief zijn. Gebruik altijd de oorspronkelijke bron bij publicatie. De samensteller aanvaardt geen aansprakelijkheid voor fouten of gevolgen van het gebruik van deze site.</p>
+
+<p>De stopwoordenlijst die gebruikt wordt voor de trending-extractie komt van <a href="https://github.com/stopwords-iso/stopwords-nl" target="_blank" rel="noopener">stopwords-iso/stopwords-nl</a> (MIT-licentie).</p>
+
+<div class="footer">
+  <a href="/">Loep</a> &middot; <a href="/privacy.html">Privacyverklaring</a>
+</div>
+
+</main>
+</body>
+</html>
